@@ -7,14 +7,17 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME, STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import TemplateError
 from jinja2.utils import Namespace
 
+from homeassistant.helpers.debounce import Debouncer
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.template import Template
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
@@ -33,10 +36,13 @@ from .const import (
     DOMAIN,
     KIND_COMBINE,
     KIND_TEMPLATE,
+    UPDATE_MODE_STATE,
     entry_interval,
     entry_name,
     entry_sensors,
+    entry_update_mode,
 )
+from .sources import collect_trigger_entity_ids
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,12 +59,10 @@ class SensorTickResult:
 class ThrottledLinkedTemplateCoordinator(
     DataUpdateCoordinator[dict[str, SensorTickResult]]
 ):
-    """Evaluate an ordered list of templates once per interval.
+    """Evaluate an ordered list of sensors on an interval or source change.
 
-    Templates are not tracked. Source `state_changed` events never trigger a
-    refresh. After each successful or failed evaluation the matching entity
-    state is written so the next template in the same tick can read it with
-    `states('sensor.xxx')`.
+    After each evaluation the matching entity state is written so the next
+    template in the same tick can read it with `states('sensor.xxx')`.
     """
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -68,15 +72,31 @@ class ThrottledLinkedTemplateCoordinator(
         self._results: dict[str, SensorTickResult] = {}
         self._tick_states: dict[str, Any] = {}
         self._entities_ready = asyncio.Event()
+        self._unsub_state: Callable[[], None] | None = None
+        mode = entry_update_mode(entry)
+        interval = entry_interval(entry)
         kwargs: dict[str, Any] = {
             "name": f"{DOMAIN}_{entry.entry_id}",
-            "update_interval": timedelta(seconds=entry_interval(entry)),
             "always_update": True,
         }
+        if mode == UPDATE_MODE_STATE:
+            kwargs["update_interval"] = None
+            try:
+                kwargs["request_refresh_debouncer"] = Debouncer(
+                    hass,
+                    _LOGGER,
+                    cooldown=float(interval),
+                    immediate=False,
+                )
+            except TypeError:
+                pass
+        else:
+            kwargs["update_interval"] = timedelta(seconds=interval)
         try:
             super().__init__(hass, _LOGGER, config_entry=entry, **kwargs)
         except TypeError:
             kwargs.pop("always_update", None)
+            kwargs.pop("request_refresh_debouncer", None)
             super().__init__(hass, _LOGGER, **kwargs)
 
     @property
@@ -112,6 +132,59 @@ class ThrottledLinkedTemplateCoordinator(
                 len(self._entities),
                 expected,
             )
+
+    def async_start_listeners(self) -> None:
+        """Listen to source entity changes when the group is in state mode."""
+        self.async_stop_listeners()
+        if entry_update_mode(self.entry) != UPDATE_MODE_STATE:
+            return
+        own_ids = {
+            str(entity.entity_id)
+            for entity in self._entities.values()
+            if getattr(entity, "entity_id", None)
+        }
+        sources = collect_trigger_entity_ids(self.sensors, own_ids)
+        if not sources:
+            _LOGGER.warning(
+                "Group '%s' is set to update on source change but no source "
+                "entities were found in combine lists or templates",
+                entry_name(self.entry),
+            )
+            return
+        self._unsub_state = async_track_state_change_event(
+            self.hass, sources, self._async_source_changed
+        )
+        _LOGGER.debug(
+            "Group '%s' listening for changes on %s",
+            entry_name(self.entry),
+            sources,
+        )
+
+    def async_stop_listeners(self) -> None:
+        """Remove source entity listeners."""
+        if self._unsub_state is not None:
+            self._unsub_state()
+            self._unsub_state = None
+
+    @callback
+    def _async_source_changed(self, event: Event) -> None:
+        """Recalculate the group after an external source changes."""
+        entity_id = event.data.get("entity_id")
+        own_ids = {
+            str(entity.entity_id)
+            for entity in self._entities.values()
+            if getattr(entity, "entity_id", None)
+        }
+        if entity_id in own_ids:
+            return
+        self.hass.async_create_task(self.async_request_refresh())
+
+    async def async_shutdown(self) -> None:
+        """Stop listeners then shut down the coordinator."""
+        self.async_stop_listeners()
+        shutdown = getattr(super(), "async_shutdown", None)
+        if shutdown is not None:
+            await shutdown()
 
     def result_for(self, sensor_id: str) -> SensorTickResult | None:
         """Return the latest result, including in-progress tick values."""

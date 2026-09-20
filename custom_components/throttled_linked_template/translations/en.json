@@ -4,19 +4,21 @@
     "step": {
       "user": {
         "title": "New template group",
-        "description": "Sensors in this group are recalculated together on a fixed interval, in order. Later sensors can read earlier ones in the same tick with states('sensor.xxx'). Source changes do not trigger a recalculation.",
+        "description": "Sensors in this group are recalculated together, in order. Later sensors can read earlier ones in the same tick with states('sensor.xxx') or linked.",
         "data": {
           "name": "Group name",
+          "update_mode": "Update mode",
           "interval": "Interval"
         },
         "data_description": {
           "name": "Name of the helper group shown as a device in Home Assistant.",
-          "interval": "How often every sensor in the group is recalculated, in seconds (minimum 1)."
+          "update_mode": "Recalculate on a timer, or when a source entity used by a combine/template changes.",
+          "interval": "Timer period, or minimum seconds between recalculations in on-change mode (minimum 1)."
         }
       },
       "menu": {
         "title": "Group sensors",
-        "description": "Group **{name}** — every {interval} s — {count} sensor(s).\n\nEvaluation order:\n{sensors}",
+        "description": "Group **{name}** — {update_mode} — {interval} s — {count} sensor(s).\n\nEvaluation order:\n{sensors}",
         "menu_options": {
           "add_sensor": "Add a sensor",
           "pick_edit": "Edit a sensor",
@@ -124,6 +126,7 @@
       "invalid_name": "Enter a name.",
       "invalid_interval": "Interval must be an integer of at least 1 second.",
       "invalid_template": "This Jinja template is not valid.",
+      "invalid_update_mode": "Choose a valid update mode.",
       "no_entities": "Select at least one source entity.",
       "invalid_combine_type": "Choose a valid combine type.",
       "last_sensor": "The group must keep at least one sensor."
@@ -136,19 +139,21 @@
     "step": {
       "init": {
         "title": "Group settings",
-        "description": "Change the name and interval without recreating the group. Sensor unique IDs are kept when you edit the list.\n\nCurrent sensors:\n{sensors}",
+        "description": "Change the name, update mode and interval without recreating the group. Sensor unique IDs are kept when you edit the list.\n\nCurrent sensors:\n{sensors}",
         "data": {
           "name": "Group name",
+          "update_mode": "Update mode",
           "interval": "Interval"
         },
         "data_description": {
           "name": "Name of the helper group shown as a device in Home Assistant.",
-          "interval": "How often every sensor in the group is recalculated, in seconds (minimum 1)."
+          "update_mode": "Recalculate on a timer, or when a source entity used by a combine/template changes.",
+          "interval": "Timer period, or minimum seconds between recalculations in on-change mode (minimum 1)."
         }
       },
       "menu": {
         "title": "Group sensors",
-        "description": "Group **{name}** — every {interval} s — {count} sensor(s).\n\nEvaluation order:\n{sensors}",
+        "description": "Group **{name}** — {update_mode} — {interval} s — {count} sensor(s).\n\nEvaluation order:\n{sensors}",
         "menu_options": {
           "add_sensor": "Add a sensor",
           "pick_edit": "Edit a sensor",
@@ -240,6 +245,7 @@
       "invalid_name": "Enter a name.",
       "invalid_interval": "Interval must be an integer of at least 1 second.",
       "invalid_template": "This Jinja template is not valid.",
+      "invalid_update_mode": "Choose a valid update mode.",
       "no_entities": "Select at least one source entity.",
       "invalid_combine_type": "Choose a valid combine type.",
       "last_sensor": "The group must keep at least one sensor."
@@ -263,6 +269,12 @@
         "median": "Median",
         "last": "Last updated",
         "range": "Range"
+      }
+    },
+    "update_mode": {
+      "options": {
+        "interval": "Every X seconds",
+        "state": "When a source entity changes"
       }
     }
   }

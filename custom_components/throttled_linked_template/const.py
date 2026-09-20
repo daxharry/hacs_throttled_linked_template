@@ -10,6 +10,7 @@ from homeassistant.const import CONF_NAME
 DOMAIN: Final = "throttled_linked_template"
 
 CONF_INTERVAL: Final = "interval"
+CONF_UPDATE_MODE: Final = "update_mode"
 CONF_SENSORS: Final = "sensors"
 CONF_TEMPLATE: Final = "template"
 CONF_SENSOR_ID: Final = "id"
@@ -47,6 +48,11 @@ DEFAULT_ROUND_DIGITS: Final = 2
 
 DEFAULT_INTERVAL: Final = 5
 MIN_INTERVAL: Final = 1
+
+UPDATE_MODE_INTERVAL: Final = "interval"
+UPDATE_MODE_STATE: Final = "state"
+DEFAULT_UPDATE_MODE: Final = UPDATE_MODE_INTERVAL
+UPDATE_MODES: Final = (UPDATE_MODE_INTERVAL, UPDATE_MODE_STATE)
 
 ATTR_LINKED_INDEX: Final = "linked_index"
 ATTR_LAST_ERROR: Final = "last_error"
@@ -150,6 +156,16 @@ def entry_interval(entry: ConfigEntry) -> int:
     except (TypeError, ValueError):
         return DEFAULT_INTERVAL
     return max(MIN_INTERVAL, interval)
+
+
+def entry_update_mode(entry: ConfigEntry) -> str:
+    """Return how the group is recalculated."""
+    mode = entry.options.get(
+        CONF_UPDATE_MODE, entry.data.get(CONF_UPDATE_MODE, DEFAULT_UPDATE_MODE)
+    )
+    if mode == UPDATE_MODE_STATE:
+        return UPDATE_MODE_STATE
+    return UPDATE_MODE_INTERVAL
 
 
 def entry_sensors(entry: ConfigEntry) -> list[dict[str, Any]]:

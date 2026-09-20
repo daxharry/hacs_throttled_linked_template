@@ -23,6 +23,7 @@ from .const import (
     CONF_DEVICE_CLASS,
     CONF_ENTITY_IDS,
     CONF_INTERVAL,
+    CONF_UPDATE_MODE,
     CONF_KIND,
     CONF_ROUND_DIGITS,
     CONF_SENSOR_ID,
@@ -33,6 +34,7 @@ from .const import (
     DEFAULT_COMBINE_TYPE,
     DEFAULT_INTERVAL,
     DEFAULT_ROUND_DIGITS,
+    DEFAULT_UPDATE_MODE,
     DEVICE_CLASS_OPTIONS,
     DOMAIN,
     KIND_COMBINE,
@@ -40,9 +42,11 @@ from .const import (
     MIN_INTERVAL,
     STATE_CLASS_OPTIONS,
     UNIT_OPTIONS,
+    UPDATE_MODES,
     entry_interval,
     entry_name,
     entry_sensors,
+    entry_update_mode,
 )
 
 CONF_INDEX = "index"
@@ -54,11 +58,22 @@ ACTION_TOP = "top"
 ACTION_BOTTOM = "bottom"
 
 
-def _group_schema(name: str, interval: int) -> vol.Schema:
-    """Return the schema for group name and interval."""
+def _group_schema(
+    name: str, interval: int, update_mode: str = DEFAULT_UPDATE_MODE
+) -> vol.Schema:
+    """Return the schema for group name, mode and interval."""
     return vol.Schema(
         {
             vol.Required(CONF_NAME, default=name): selector.TextSelector(),
+            vol.Required(
+                CONF_UPDATE_MODE, default=update_mode or DEFAULT_UPDATE_MODE
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=list(UPDATE_MODES),
+                    mode=selector.SelectSelectorMode.LIST,
+                    translation_key="update_mode",
+                )
+            ),
             vol.Required(CONF_INTERVAL, default=interval): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=MIN_INTERVAL,
@@ -307,6 +322,7 @@ class _SensorListMixin:
     hass: Any
     _name: str
     _interval: int
+    _update_mode: str
     _sensors: list[dict[str, Any]]
     _edit_index: int | None
     _menu_step_id: str
@@ -317,9 +333,11 @@ class _SensorListMixin:
         interval: int = DEFAULT_INTERVAL,
         sensors: list[dict[str, Any]] | None = None,
         menu_step_id: str = "menu",
+        update_mode: str = DEFAULT_UPDATE_MODE,
     ) -> None:
         self._name = name
         self._interval = interval
+        self._update_mode = update_mode
         self._sensors = [dict(sensor) for sensor in (sensors or [])]
         self._edit_index = None
         self._menu_step_id = menu_step_id
@@ -336,9 +354,13 @@ class _SensorListMixin:
             interval = DEFAULT_INTERVAL
         if interval < MIN_INTERVAL:
             errors[CONF_INTERVAL] = "invalid_interval"
+        mode = str(user_input.get(CONF_UPDATE_MODE, DEFAULT_UPDATE_MODE))
+        if mode not in UPDATE_MODES:
+            errors[CONF_UPDATE_MODE] = "invalid_update_mode"
         if not errors:
             self._name = name
             self._interval = interval
+            self._update_mode = mode
         return errors
 
     def _validate_sensor(self, user_input: Mapping[str, Any]) -> dict[str, str]:
@@ -387,6 +409,7 @@ class _SensorListMixin:
             description_placeholders={
                 "name": self._name or "",
                 "interval": str(self._interval),
+                "update_mode": self._update_mode or DEFAULT_UPDATE_MODE,
                 "count": str(len(self._sensors)),
                 "sensors": _sensor_summary(self._sensors),
             },
@@ -607,7 +630,9 @@ class ThrottledLinkedTemplateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
                 return await self.async_step_add_sensor()
         return self.async_show_form(
             step_id="user",
-            data_schema=_group_schema(self._name, self._interval),
+            data_schema=_group_schema(
+                self._name, self._interval, self._update_mode
+            ),
             errors=errors,
         )
 
@@ -618,6 +643,7 @@ class ThrottledLinkedTemplateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
             data={CONF_NAME: self._name},
             options={
                 CONF_INTERVAL: self._interval,
+                CONF_UPDATE_MODE: self._update_mode,
                 CONF_SENSORS: self._sensors,
             },
         )
@@ -644,6 +670,7 @@ class ThrottledLinkedTemplateOptionsFlow(config_entries.OptionsFlow):
         if not self._name and self._entry is not None:
             self._name = entry_name(self._entry)
             self._interval = entry_interval(self._entry)
+            self._update_mode = entry_update_mode(self._entry)
             self._sensors = entry_sensors(self._entry)
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -652,7 +679,9 @@ class ThrottledLinkedTemplateOptionsFlow(config_entries.OptionsFlow):
                 return self._show_menu()
         return self.async_show_form(
             step_id="init",
-            data_schema=_group_schema(self._name, self._interval),
+            data_schema=_group_schema(
+                self._name, self._interval, self._update_mode
+            ),
             errors=errors,
             description_placeholders={
                 "sensors": _sensor_summary(self._sensors),
@@ -672,6 +701,7 @@ class ThrottledLinkedTemplateOptionsFlow(config_entries.OptionsFlow):
             title="",
             data={
                 CONF_INTERVAL: self._interval,
+                CONF_UPDATE_MODE: self._update_mode,
                 CONF_SENSORS: self._sensors,
             },
         )

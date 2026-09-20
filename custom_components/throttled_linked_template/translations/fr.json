@@ -4,19 +4,21 @@
     "step": {
       "user": {
         "title": "Nouveau groupe",
-        "description": "Les capteurs de ce groupe sont recalculés ensemble, dans l'ordre, à intervalle fixe. Un capteur suivant peut lire un capteur précédent dans le même tick avec states('sensor.xxx'). Les changements des sources ne déclenchent pas de recalcul.",
+        "description": "Les capteurs de ce groupe sont recalculés ensemble, dans l'ordre. Un capteur suivant peut lire un capteur précédent dans le même tick avec states('sensor.xxx') ou linked.",
         "data": {
           "name": "Nom du groupe",
+          "update_mode": "Mode de mise à jour",
           "interval": "Intervalle"
         },
         "data_description": {
           "name": "Nom du helper affiché comme appareil dans Home Assistant.",
-          "interval": "Fréquence de recalcul de tous les capteurs du groupe, en secondes (minimum 1)."
+          "update_mode": "Recalculer sur un minuteur, ou dès qu'une entité source d'un combine/template change.",
+          "interval": "Période du minuteur, ou délai minimum entre deux recalculs en mode changement (minimum 1 s)."
         }
       },
       "menu": {
         "title": "Capteurs du groupe",
-        "description": "Groupe **{name}** — toutes les {interval} s — {count} capteur(s).\n\nOrdre d'évaluation :\n{sensors}",
+        "description": "Groupe **{name}** — {update_mode} — {interval} s — {count} capteur(s).\n\nOrdre d'évaluation :\n{sensors}",
         "menu_options": {
           "add_sensor": "Ajouter un capteur",
           "pick_edit": "Modifier un capteur",
@@ -124,6 +126,7 @@
       "invalid_name": "Saisissez un nom.",
       "invalid_interval": "L'intervalle doit être un entier d'au moins 1 seconde.",
       "invalid_template": "Ce template Jinja n'est pas valide.",
+      "invalid_update_mode": "Choisissez un mode de mise à jour valide.",
       "no_entities": "Sélectionnez au moins une entité source.",
       "invalid_combine_type": "Choisissez un type de combinaison valide.",
       "last_sensor": "Le groupe doit conserver au moins un capteur."
@@ -136,19 +139,21 @@
     "step": {
       "init": {
         "title": "Paramètres du groupe",
-        "description": "Modifiez le nom et l'intervalle sans recréer le groupe. Les identifiants uniques des capteurs sont conservés lorsque vous éditez la liste.\n\nCapteurs actuels :\n{sensors}",
+        "description": "Modifiez le nom, le mode de mise à jour et l'intervalle sans recréer le groupe. Les identifiants uniques des capteurs sont conservés lorsque vous éditez la liste.\n\nCapteurs actuels :\n{sensors}",
         "data": {
           "name": "Nom du groupe",
+          "update_mode": "Mode de mise à jour",
           "interval": "Intervalle"
         },
         "data_description": {
           "name": "Nom du helper affiché comme appareil dans Home Assistant.",
-          "interval": "Fréquence de recalcul de tous les capteurs du groupe, en secondes (minimum 1)."
+          "update_mode": "Recalculer sur un minuteur, ou dès qu'une entité source d'un combine/template change.",
+          "interval": "Période du minuteur, ou délai minimum entre deux recalculs en mode changement (minimum 1 s)."
         }
       },
       "menu": {
         "title": "Capteurs du groupe",
-        "description": "Groupe **{name}** — toutes les {interval} s — {count} capteur(s).\n\nOrdre d'évaluation :\n{sensors}",
+        "description": "Groupe **{name}** — {update_mode} — {interval} s — {count} capteur(s).\n\nOrdre d'évaluation :\n{sensors}",
         "menu_options": {
           "add_sensor": "Ajouter un capteur",
           "pick_edit": "Modifier un capteur",
@@ -240,6 +245,7 @@
       "invalid_name": "Saisissez un nom.",
       "invalid_interval": "L'intervalle doit être un entier d'au moins 1 seconde.",
       "invalid_template": "Ce template Jinja n'est pas valide.",
+      "invalid_update_mode": "Choisissez un mode de mise à jour valide.",
       "no_entities": "Sélectionnez au moins une entité source.",
       "invalid_combine_type": "Choisissez un type de combinaison valide.",
       "last_sensor": "Le groupe doit conserver au moins un capteur."
@@ -263,6 +269,12 @@
         "median": "Médiane",
         "last": "Dernier mis à jour",
         "range": "Étendue"
+      }
+    },
+    "update_mode": {
+      "options": {
+        "interval": "Toutes les X secondes",
+        "state": "Quand une entité source change"
       }
     }
   }

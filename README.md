@@ -72,10 +72,13 @@ The integration appears under **Settings → Devices & services → Integrations
 
 1. **Add integration** and search for **Throttled Linked Template**
 2. Set the **group name** and **interval** (seconds, minimum 1, default 5)
-3. Add sensors in evaluation order. Each one is either:
+3. Choose the **update mode**:
+   - **Every X seconds** — current behaviour, one tick per interval
+   - **When a source entity changes** — the whole group is recalculated (in order) when a combine source or an entity referenced in a template (`states('sensor.xxx')`, …) changes. Group sensors themselves are ignored to avoid a loop. The interval becomes the **minimum time between ticks**.
+4. Add sensors in evaluation order. Each one is either:
    - **Template** — a Jinja template
    - **Combine** — several source entities, like Home Assistant's "Combine the state of several sensors" helper (`sum`, `mean`, `min`, `max`, `median`, `last`, `range`)
-4. Add, edit, remove or reorder sensors, then create the group
+5. Add, edit, remove or reorder sensors, then create the group
 
 You can add as many groups as you need. They stay independent.
 
@@ -122,7 +125,7 @@ Same-tick values of **previous** sensors in this group are in `linked` (the curr
 
 ## Behaviour notes
 
-- Recalculation is **only** on the interval (and at startup). Source sensors can change in between; this group will not notice until the next tick.
+- Recalculation is either on the interval or when a **source** entity changes (and at startup). Group members are not used as triggers.
 - Templates are standard Home Assistant Jinja. They are rendered with `Template.async_render` and are **not** tracked.
 - Combine sensors skip unavailable / non-numeric sources. If none remain, that sensor is `unavailable` for the tick.
 - A render result of `unknown` or `unavailable` makes that sensor unavailable for the tick.
