@@ -13,6 +13,9 @@ CONF_INTERVAL: Final = "interval"
 CONF_SENSORS: Final = "sensors"
 CONF_TEMPLATE: Final = "template"
 CONF_SENSOR_ID: Final = "id"
+CONF_DEVICE_CLASS: Final = "device_class"
+CONF_STATE_CLASS: Final = "state_class"
+CONF_UNIT_OF_MEASUREMENT: Final = "unit_of_measurement"
 
 DEFAULT_INTERVAL: Final = 5
 MIN_INTERVAL: Final = 1

@@ -12,21 +12,19 @@ except ImportError:  # Home Assistant < 2026.9 still ships voluptuous
     import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.const import (
-    CONF_DEVICE_CLASS,
-    CONF_NAME,
-    CONF_STATE_CLASS,
-    CONF_UNIT_OF_MEASUREMENT,
-)
+from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
 from homeassistant.exceptions import TemplateError
 from homeassistant.helpers import selector
 
 from .const import (
+    CONF_DEVICE_CLASS,
     CONF_INTERVAL,
     CONF_SENSOR_ID,
     CONF_SENSORS,
+    CONF_STATE_CLASS,
     CONF_TEMPLATE,
+    CONF_UNIT_OF_MEASUREMENT,
     DEFAULT_INTERVAL,
     DEVICE_CLASS_OPTIONS,
     DOMAIN,

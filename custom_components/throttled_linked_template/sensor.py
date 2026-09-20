@@ -11,12 +11,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    CONF_DEVICE_CLASS,
-    CONF_NAME,
-    CONF_STATE_CLASS,
-    CONF_UNIT_OF_MEASUREMENT,
-)
+from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -26,7 +21,10 @@ from homeassistant.util import slugify
 from .const import (
     ATTR_LAST_ERROR,
     ATTR_LINKED_INDEX,
+    CONF_DEVICE_CLASS,
     CONF_SENSOR_ID,
+    CONF_STATE_CLASS,
+    CONF_UNIT_OF_MEASUREMENT,
     DOMAIN,
     entry_name,
     entry_sensors,
