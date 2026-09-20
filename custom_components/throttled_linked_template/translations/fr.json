@@ -26,7 +26,7 @@
         }
       },
       "add_sensor": {
-        "title": "Ajouter le capteur {position}",
+        "title": "Ajouter un capteur",
         "description": "Choisissez le mode de calcul. Ce capteur est évalué en position {position}. Les suivants peuvent le lire dans le même tick avec states('sensor.xxx').\n\nOrdre actuel :\n{sensors}",
         "menu_options": {
           "add_template": "Template (Jinja)",
@@ -158,7 +158,7 @@
         }
       },
       "add_sensor": {
-        "title": "Ajouter le capteur {position}",
+        "title": "Ajouter un capteur",
         "description": "Choisissez le mode de calcul. Ce capteur est évalué en position {position}. Les suivants peuvent le lire dans le même tick avec states('sensor.xxx').\n\nOrdre actuel :\n{sensors}",
         "menu_options": {
           "add_template": "Template (Jinja)",
