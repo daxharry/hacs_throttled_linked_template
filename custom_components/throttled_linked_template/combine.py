@@ -42,8 +42,11 @@ def combine_states(
     for entity_id in entity_ids:
         raw: Any = None
         updated = None
+        object_id = entity_id.split(".", 1)[-1] if "." in entity_id else entity_id
         if overrides and entity_id in overrides:
             raw = overrides[entity_id]
+        elif overrides and object_id in overrides:
+            raw = overrides[object_id]
         else:
             state = hass.states.get(entity_id)
             if state is None or state.state in (

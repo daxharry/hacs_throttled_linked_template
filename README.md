@@ -109,12 +109,14 @@ On every tick, sensor 2 reads the value sensor 1 just wrote, and sensor 3 reads 
 
 The `this` variable is available (`this.state`, `this.entity_id`, `this.name`) and refers to the sensor currently being evaluated.
 
-Same-tick values are also in `linked`:
+Same-tick values of **previous** sensors in this group are in `linked` (the current sensor is not included yet). Keys are the `entity_id`, the object id, and the slug of the sensor name:
 
 ```jinja
 {{ linked['sensor.pv_power_w'] }}
 {{ linked.pv_power_w }}
 ```
+
+`linked.xxx` is the native value (a number when the template/combine produced a number), not the string from `states()`.
 
 ---
 

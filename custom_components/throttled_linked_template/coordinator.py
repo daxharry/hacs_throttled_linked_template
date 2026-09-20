@@ -16,6 +16,7 @@ from homeassistant.exceptions import TemplateError
 from homeassistant.helpers.template import Template
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
+from homeassistant.util import slugify
 
 from .combine import CombineError, combine_states
 from .const import (
@@ -176,7 +177,7 @@ class ThrottledLinkedTemplateCoordinator(
 
             results[sensor_id] = result
             self._results[sensor_id] = result
-            self._publish_result(entity, result)
+            self._publish_result(entity, result, sensor_name)
             _LOGGER.debug(
                 "Group '%s' [%s/%s] %s = %s (available=%s)",
                 group_name,
@@ -230,19 +231,21 @@ class ThrottledLinkedTemplateCoordinator(
         )
         return _normalize_native_value(rendered)
 
-    def _publish_result(self, entity: Any | None, result: SensorTickResult) -> None:
+    def _publish_result(
+        self, entity: Any | None, result: SensorTickResult, sensor_name: str
+    ) -> None:
         """Write this sensor so the next one in the same tick can read it."""
+        value = result.native_value if result.available else None
         entity_id = getattr(entity, "entity_id", None) if entity is not None else None
-        published = (
-            STATE_UNAVAILABLE
-            if not result.available
-            else _stringify_state(result.native_value)
-        )
+        keys: list[str] = []
+        if sensor_name:
+            keys.append(slugify(sensor_name))
         if entity_id and "." in entity_id and not entity_id.endswith("."):
-            self._tick_states[entity_id] = (
-                result.native_value if result.available else None
-            )
-            self._tick_states[entity_id.split(".", 1)[-1]] = self._tick_states[entity_id]
+            keys.append(entity_id)
+            keys.append(entity_id.split(".", 1)[-1])
+        for key in keys:
+            if key:
+                self._tick_states[key] = value
 
         if entity is not None and getattr(entity, "hass", None) is not None:
             try:
@@ -254,9 +257,10 @@ class ThrottledLinkedTemplateCoordinator(
                 )
 
         if entity_id and "." in entity_id and not entity_id.endswith("."):
-            self.hass.states.async_set(
-                entity_id, published, None, force_update=True
+            published = (
+                STATE_UNAVAILABLE if not result.available else _stringify_state(value)
             )
+            self.hass.states.async_set(entity_id, published, None, force_update=True)
 
 
 def _current_state_value(entity: Any) -> Any:
