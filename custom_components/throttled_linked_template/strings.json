@@ -27,6 +27,14 @@
       },
       "add_sensor": {
         "title": "Add sensor {position}",
+        "description": "Choose how this sensor is calculated. It is evaluated at position {position}. Later sensors can read it in the same tick with states('sensor.xxx').\n\nCurrent order:\n{sensors}",
+        "menu_options": {
+          "add_template": "Template (Jinja)",
+          "add_combine": "Combine several sensors"
+        }
+      },
+      "add_template": {
+        "title": "Add template sensor {position}",
         "description": "This sensor is evaluated at position {position}. It can use states() of sensors already listed above.\n\nCurrent order:\n{sensors}",
         "data": {
           "name": "Name",
@@ -38,6 +46,28 @@
         "data_description": {
           "name": "Friendly name of the sensor. The entity ID is derived from this name.",
           "template": "Home Assistant Jinja template. Later sensors in this group can read this one in the same tick after it has been written.",
+          "unit_of_measurement": "Optional. Custom values are allowed.",
+          "device_class": "Optional.",
+          "state_class": "Optional. Use measurement, total or total_increasing for statistics."
+        }
+      },
+      "add_combine": {
+        "title": "Add combine sensor {position}",
+        "description": "Like Home Assistant's \"Combine the state of several sensors\" helper, but recalculated on this group's interval. Unavailable sources are skipped.\n\nCurrent order:\n{sensors}",
+        "data": {
+          "name": "Name",
+          "entity_ids": "Source sensors",
+          "combine_type": "Combine type",
+          "round_digits": "Decimal places",
+          "unit_of_measurement": "Unit of measurement",
+          "device_class": "Device class",
+          "state_class": "State class"
+        },
+        "data_description": {
+          "name": "Friendly name of the sensor. The entity ID is derived from this name.",
+          "entity_ids": "Entities whose numeric states are combined on each tick.",
+          "combine_type": "sum, mean, min, max, median, last (most recently updated) or range.",
+          "round_digits": "How many digits to keep after the decimal point.",
           "unit_of_measurement": "Optional. Custom values are allowed.",
           "device_class": "Optional.",
           "state_class": "Optional. Use measurement, total or total_increasing for statistics."
@@ -61,6 +91,19 @@
           "state_class": "State class"
         }
       },
+      "edit_combine": {
+        "title": "Edit {name}",
+        "description": "The unique ID is kept, so history and the entity ID stay attached to this sensor.\n\n{sensors}",
+        "data": {
+          "name": "Name",
+          "entity_ids": "Source sensors",
+          "combine_type": "Combine type",
+          "round_digits": "Decimal places",
+          "unit_of_measurement": "Unit of measurement",
+          "device_class": "Device class",
+          "state_class": "State class"
+        }
+      },
       "pick_remove": {
         "title": "Remove a sensor",
         "description": "The group must keep at least one sensor.\n\n{sensors}",
@@ -70,7 +113,7 @@
       },
       "reorder": {
         "title": "Reorder sensors",
-        "description": "Templates are evaluated from top to bottom on every tick.\n\n{sensors}",
+        "description": "Sensors are evaluated from top to bottom on every tick.\n\n{sensors}",
         "data": {
           "index": "Sensor",
           "action": "Move"
@@ -81,6 +124,8 @@
       "invalid_name": "Enter a name.",
       "invalid_interval": "Interval must be an integer of at least 1 second.",
       "invalid_template": "This Jinja template is not valid.",
+      "no_entities": "Select at least one source entity.",
+      "invalid_combine_type": "Choose a valid combine type.",
       "last_sensor": "The group must keep at least one sensor."
     },
     "abort": {
@@ -114,10 +159,31 @@
       },
       "add_sensor": {
         "title": "Add sensor {position}",
+        "description": "Choose how this sensor is calculated. It is evaluated at position {position}. Later sensors can read it in the same tick with states('sensor.xxx').\n\nCurrent order:\n{sensors}",
+        "menu_options": {
+          "add_template": "Template (Jinja)",
+          "add_combine": "Combine several sensors"
+        }
+      },
+      "add_template": {
+        "title": "Add template sensor {position}",
         "description": "This sensor is evaluated at position {position}. It can use states() of sensors already listed above.\n\nCurrent order:\n{sensors}",
         "data": {
           "name": "Name",
           "template": "Template",
+          "unit_of_measurement": "Unit of measurement",
+          "device_class": "Device class",
+          "state_class": "State class"
+        }
+      },
+      "add_combine": {
+        "title": "Add combine sensor {position}",
+        "description": "Like Home Assistant's \"Combine the state of several sensors\" helper, but recalculated on this group's interval. Unavailable sources are skipped.\n\nCurrent order:\n{sensors}",
+        "data": {
+          "name": "Name",
+          "entity_ids": "Source sensors",
+          "combine_type": "Combine type",
+          "round_digits": "Decimal places",
           "unit_of_measurement": "Unit of measurement",
           "device_class": "Device class",
           "state_class": "State class"
@@ -141,6 +207,19 @@
           "state_class": "State class"
         }
       },
+      "edit_combine": {
+        "title": "Edit {name}",
+        "description": "The unique ID is kept, so history and the entity ID stay attached to this sensor.\n\n{sensors}",
+        "data": {
+          "name": "Name",
+          "entity_ids": "Source sensors",
+          "combine_type": "Combine type",
+          "round_digits": "Decimal places",
+          "unit_of_measurement": "Unit of measurement",
+          "device_class": "Device class",
+          "state_class": "State class"
+        }
+      },
       "pick_remove": {
         "title": "Remove a sensor",
         "description": "The group must keep at least one sensor.\n\n{sensors}",
@@ -150,7 +229,7 @@
       },
       "reorder": {
         "title": "Reorder sensors",
-        "description": "Templates are evaluated from top to bottom on every tick.\n\n{sensors}",
+        "description": "Sensors are evaluated from top to bottom on every tick.\n\n{sensors}",
         "data": {
           "index": "Sensor",
           "action": "Move"
@@ -161,6 +240,8 @@
       "invalid_name": "Enter a name.",
       "invalid_interval": "Interval must be an integer of at least 1 second.",
       "invalid_template": "This Jinja template is not valid.",
+      "no_entities": "Select at least one source entity.",
+      "invalid_combine_type": "Choose a valid combine type.",
       "last_sensor": "The group must keep at least one sensor."
     }
   },
@@ -171,6 +252,17 @@
         "down": "Move down",
         "top": "Move to top",
         "bottom": "Move to bottom"
+      }
+    },
+    "combine_type": {
+      "options": {
+        "sum": "Sum",
+        "mean": "Mean",
+        "min": "Minimum",
+        "max": "Maximum",
+        "median": "Median",
+        "last": "Last updated",
+        "range": "Range"
       }
     }
   }

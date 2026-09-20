@@ -16,10 +16,19 @@ from homeassistant.helpers.template import Template
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
+from .combine import CombineError, combine_states
 from .const import (
+    CONF_COMBINE_TYPE,
+    CONF_ENTITY_IDS,
+    CONF_KIND,
+    CONF_ROUND_DIGITS,
     CONF_SENSOR_ID,
     CONF_TEMPLATE,
+    DEFAULT_COMBINE_TYPE,
+    DEFAULT_ROUND_DIGITS,
     DOMAIN,
+    KIND_COMBINE,
+    KIND_TEMPLATE,
     entry_interval,
     entry_name,
     entry_sensors,
@@ -99,16 +108,13 @@ class ThrottledLinkedTemplateCoordinator(
 
         for sensor in self.sensors:
             sensor_id = str(sensor[CONF_SENSOR_ID])
-            template_str = str(sensor.get(CONF_TEMPLATE, ""))
             entity = self._entities.get(sensor_id)
             sensor_name = str(sensor.get(CONF_NAME, sensor_id))
             try:
-                native_value = self._async_render_template(
-                    template_str, entity=entity
-                )
-            except TemplateError as err:
+                native_value = self._async_evaluate_sensor(sensor, entity)
+            except (TemplateError, CombineError) as err:
                 _LOGGER.warning(
-                    "Template error in group '%s' sensor '%s': %s",
+                    "Sensor error in group '%s' sensor '%s': %s",
                     group_name,
                     sensor_name,
                     err,
@@ -155,6 +161,23 @@ class ThrottledLinkedTemplateCoordinator(
             self._results.pop(stale_id, None)
 
         return results
+
+    def _async_evaluate_sensor(self, sensor: dict[str, Any], entity: Any | None) -> Any:
+        """Evaluate one sensor for this tick."""
+        kind = str(sensor.get(CONF_KIND, KIND_TEMPLATE))
+        if kind == KIND_COMBINE:
+            entity_ids = [
+                str(item) for item in sensor.get(CONF_ENTITY_IDS, []) if item
+            ]
+            return combine_states(
+                self.hass,
+                entity_ids,
+                str(sensor.get(CONF_COMBINE_TYPE, DEFAULT_COMBINE_TYPE)),
+                int(sensor.get(CONF_ROUND_DIGITS, DEFAULT_ROUND_DIGITS) or 0),
+            )
+        return self._async_render_template(
+            str(sensor.get(CONF_TEMPLATE, "")), entity=entity
+        )
 
     def _async_render_template(self, template_str: str, entity: Any | None) -> Any:
         """Render a Jinja template without setting up state listeners."""

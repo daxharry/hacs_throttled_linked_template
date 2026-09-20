@@ -13,9 +13,37 @@ CONF_INTERVAL: Final = "interval"
 CONF_SENSORS: Final = "sensors"
 CONF_TEMPLATE: Final = "template"
 CONF_SENSOR_ID: Final = "id"
+CONF_KIND: Final = "kind"
+CONF_ENTITY_IDS: Final = "entity_ids"
+CONF_COMBINE_TYPE: Final = "combine_type"
+CONF_ROUND_DIGITS: Final = "round_digits"
 CONF_DEVICE_CLASS: Final = "device_class"
 CONF_STATE_CLASS: Final = "state_class"
 CONF_UNIT_OF_MEASUREMENT: Final = "unit_of_measurement"
+
+KIND_TEMPLATE: Final = "template"
+KIND_COMBINE: Final = "combine"
+
+COMBINE_MIN: Final = "min"
+COMBINE_MAX: Final = "max"
+COMBINE_MEAN: Final = "mean"
+COMBINE_MEDIAN: Final = "median"
+COMBINE_LAST: Final = "last"
+COMBINE_RANGE: Final = "range"
+COMBINE_SUM: Final = "sum"
+
+COMBINE_TYPES: Final = (
+    COMBINE_SUM,
+    COMBINE_MEAN,
+    COMBINE_MIN,
+    COMBINE_MAX,
+    COMBINE_MEDIAN,
+    COMBINE_LAST,
+    COMBINE_RANGE,
+)
+
+DEFAULT_COMBINE_TYPE: Final = COMBINE_SUM
+DEFAULT_ROUND_DIGITS: Final = 2
 
 DEFAULT_INTERVAL: Final = 5
 MIN_INTERVAL: Final = 1

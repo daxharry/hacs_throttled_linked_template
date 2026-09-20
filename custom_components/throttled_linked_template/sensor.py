@@ -21,11 +21,15 @@ from homeassistant.util import slugify
 from .const import (
     ATTR_LAST_ERROR,
     ATTR_LINKED_INDEX,
+    CONF_COMBINE_TYPE,
     CONF_DEVICE_CLASS,
+    CONF_ENTITY_IDS,
+    CONF_KIND,
     CONF_SENSOR_ID,
     CONF_STATE_CLASS,
     CONF_UNIT_OF_MEASUREMENT,
     DOMAIN,
+    KIND_COMBINE,
     entry_name,
     entry_sensors,
     sensor_unique_id,
@@ -67,7 +71,6 @@ class ThrottledLinkedTemplateSensor(
 
     _attr_has_entity_name = False
     _attr_should_poll = False
-    _attr_icon = "mdi:code-braces"
 
     def __init__(
         self,
@@ -80,6 +83,14 @@ class ThrottledLinkedTemplateSensor(
         super().__init__(coordinator)
         self._sensor_id = str(sensor[CONF_SENSOR_ID])
         self._index = index
+        self._kind = str(sensor.get(CONF_KIND, "template"))
+        self._entity_ids = [
+            str(item) for item in sensor.get(CONF_ENTITY_IDS, []) if item
+        ]
+        self._combine_type = sensor.get(CONF_COMBINE_TYPE)
+        self._attr_icon = (
+            "mdi:calculator" if self._kind == KIND_COMBINE else "mdi:code-braces"
+        )
         name = str(sensor.get(CONF_NAME) or f"Sensor {index + 1}")
         self._attr_name = name
         self._attr_suggested_object_id = slugify(name)
@@ -134,7 +145,13 @@ class ThrottledLinkedTemplateSensor(
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return order and last template error."""
-        attributes: dict[str, Any] = {ATTR_LINKED_INDEX: self._index + 1}
+        attributes: dict[str, Any] = {
+            ATTR_LINKED_INDEX: self._index + 1,
+            CONF_KIND: self._kind,
+        }
+        if self._kind == KIND_COMBINE:
+            attributes[CONF_COMBINE_TYPE] = self._combine_type
+            attributes[CONF_ENTITY_IDS] = self._entity_ids
         result = self.coordinator.result_for(self._sensor_id)
         if result is not None and result.error:
             attributes[ATTR_LAST_ERROR] = result.error

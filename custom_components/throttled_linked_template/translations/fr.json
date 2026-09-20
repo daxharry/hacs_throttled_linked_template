@@ -3,7 +3,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Nouveau groupe de templates",
+        "title": "Nouveau groupe",
         "description": "Les capteurs de ce groupe sont recalculés ensemble, dans l'ordre, à intervalle fixe. Un capteur suivant peut lire un capteur précédent dans le même tick avec states('sensor.xxx'). Les changements des sources ne déclenchent pas de recalcul.",
         "data": {
           "name": "Nom du groupe",
@@ -27,6 +27,14 @@
       },
       "add_sensor": {
         "title": "Ajouter le capteur {position}",
+        "description": "Choisissez le mode de calcul. Ce capteur est évalué en position {position}. Les suivants peuvent le lire dans le même tick avec states('sensor.xxx').\n\nOrdre actuel :\n{sensors}",
+        "menu_options": {
+          "add_template": "Template (Jinja)",
+          "add_combine": "Combiner plusieurs capteurs"
+        }
+      },
+      "add_template": {
+        "title": "Ajouter un template {position}",
         "description": "Ce capteur est évalué en position {position}. Il peut utiliser states() des capteurs déjà listés ci-dessus.\n\nOrdre actuel :\n{sensors}",
         "data": {
           "name": "Nom",
@@ -38,6 +46,28 @@
         "data_description": {
           "name": "Nom affiché du capteur. L'identifiant d'entité est dérivé de ce nom.",
           "template": "Template Jinja Home Assistant. Les capteurs suivants du groupe peuvent lire celui-ci dans le même tick, une fois son état écrit.",
+          "unit_of_measurement": "Optionnel. Les valeurs personnalisées sont autorisées.",
+          "device_class": "Optionnel.",
+          "state_class": "Optionnel. Utilisez measurement, total ou total_increasing pour les statistiques."
+        }
+      },
+      "add_combine": {
+        "title": "Ajouter un combine {position}",
+        "description": "Comme le helper Home Assistant « Combiner l'état de plusieurs capteurs », mais recalculé à l'intervalle du groupe. Les sources indisponibles sont ignorées.\n\nOrdre actuel :\n{sensors}",
+        "data": {
+          "name": "Nom",
+          "entity_ids": "Capteurs sources",
+          "combine_type": "Type de combinaison",
+          "round_digits": "Décimales",
+          "unit_of_measurement": "Unité",
+          "device_class": "Classe d'appareil",
+          "state_class": "Classe d'état"
+        },
+        "data_description": {
+          "name": "Nom affiché du capteur. L'identifiant d'entité est dérivé de ce nom.",
+          "entity_ids": "Entités dont les états numériques sont combinés à chaque tick.",
+          "combine_type": "somme, moyenne, min, max, médiane, dernier (le plus récemment mis à jour) ou étendue.",
+          "round_digits": "Nombre de chiffres après la virgule.",
           "unit_of_measurement": "Optionnel. Les valeurs personnalisées sont autorisées.",
           "device_class": "Optionnel.",
           "state_class": "Optionnel. Utilisez measurement, total ou total_increasing pour les statistiques."
@@ -61,6 +91,19 @@
           "state_class": "Classe d'état"
         }
       },
+      "edit_combine": {
+        "title": "Modifier {name}",
+        "description": "L'identifiant unique est conservé : l'historique et l'entité restent attachés à ce capteur.\n\n{sensors}",
+        "data": {
+          "name": "Nom",
+          "entity_ids": "Capteurs sources",
+          "combine_type": "Type de combinaison",
+          "round_digits": "Décimales",
+          "unit_of_measurement": "Unité",
+          "device_class": "Classe d'appareil",
+          "state_class": "Classe d'état"
+        }
+      },
       "pick_remove": {
         "title": "Retirer un capteur",
         "description": "Le groupe doit conserver au moins un capteur.\n\n{sensors}",
@@ -70,7 +113,7 @@
       },
       "reorder": {
         "title": "Réordonner les capteurs",
-        "description": "Les templates sont évalués de haut en bas à chaque tick.\n\n{sensors}",
+        "description": "Les capteurs sont évalués de haut en bas à chaque tick.\n\n{sensors}",
         "data": {
           "index": "Capteur",
           "action": "Déplacer"
@@ -81,6 +124,8 @@
       "invalid_name": "Saisissez un nom.",
       "invalid_interval": "L'intervalle doit être un entier d'au moins 1 seconde.",
       "invalid_template": "Ce template Jinja n'est pas valide.",
+      "no_entities": "Sélectionnez au moins une entité source.",
+      "invalid_combine_type": "Choisissez un type de combinaison valide.",
       "last_sensor": "Le groupe doit conserver au moins un capteur."
     },
     "abort": {
@@ -114,10 +159,31 @@
       },
       "add_sensor": {
         "title": "Ajouter le capteur {position}",
+        "description": "Choisissez le mode de calcul. Ce capteur est évalué en position {position}. Les suivants peuvent le lire dans le même tick avec states('sensor.xxx').\n\nOrdre actuel :\n{sensors}",
+        "menu_options": {
+          "add_template": "Template (Jinja)",
+          "add_combine": "Combiner plusieurs capteurs"
+        }
+      },
+      "add_template": {
+        "title": "Ajouter un template {position}",
         "description": "Ce capteur est évalué en position {position}. Il peut utiliser states() des capteurs déjà listés ci-dessus.\n\nOrdre actuel :\n{sensors}",
         "data": {
           "name": "Nom",
           "template": "Template",
+          "unit_of_measurement": "Unité",
+          "device_class": "Classe d'appareil",
+          "state_class": "Classe d'état"
+        }
+      },
+      "add_combine": {
+        "title": "Ajouter un combine {position}",
+        "description": "Comme le helper Home Assistant « Combiner l'état de plusieurs capteurs », mais recalculé à l'intervalle du groupe. Les sources indisponibles sont ignorées.\n\nOrdre actuel :\n{sensors}",
+        "data": {
+          "name": "Nom",
+          "entity_ids": "Capteurs sources",
+          "combine_type": "Type de combinaison",
+          "round_digits": "Décimales",
           "unit_of_measurement": "Unité",
           "device_class": "Classe d'appareil",
           "state_class": "Classe d'état"
@@ -141,6 +207,19 @@
           "state_class": "Classe d'état"
         }
       },
+      "edit_combine": {
+        "title": "Modifier {name}",
+        "description": "L'identifiant unique est conservé : l'historique et l'entité restent attachés à ce capteur.\n\n{sensors}",
+        "data": {
+          "name": "Nom",
+          "entity_ids": "Capteurs sources",
+          "combine_type": "Type de combinaison",
+          "round_digits": "Décimales",
+          "unit_of_measurement": "Unité",
+          "device_class": "Classe d'appareil",
+          "state_class": "Classe d'état"
+        }
+      },
       "pick_remove": {
         "title": "Retirer un capteur",
         "description": "Le groupe doit conserver au moins un capteur.\n\n{sensors}",
@@ -150,7 +229,7 @@
       },
       "reorder": {
         "title": "Réordonner les capteurs",
-        "description": "Les templates sont évalués de haut en bas à chaque tick.\n\n{sensors}",
+        "description": "Les capteurs sont évalués de haut en bas à chaque tick.\n\n{sensors}",
         "data": {
           "index": "Capteur",
           "action": "Déplacer"
@@ -161,6 +240,8 @@
       "invalid_name": "Saisissez un nom.",
       "invalid_interval": "L'intervalle doit être un entier d'au moins 1 seconde.",
       "invalid_template": "Ce template Jinja n'est pas valide.",
+      "no_entities": "Sélectionnez au moins une entité source.",
+      "invalid_combine_type": "Choisissez un type de combinaison valide.",
       "last_sensor": "Le groupe doit conserver au moins un capteur."
     }
   },
@@ -171,6 +252,17 @@
         "down": "Descendre",
         "top": "En haut",
         "bottom": "En bas"
+      }
+    },
+    "combine_type": {
+      "options": {
+        "sum": "Somme",
+        "mean": "Moyenne",
+        "min": "Minimum",
+        "max": "Maximum",
+        "median": "Médiane",
+        "last": "Dernier mis à jour",
+        "range": "Étendue"
       }
     }
   }

@@ -2,7 +2,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 
-Home Assistant helper: a **group of template sensors** recalculated **together**, **in order**, every X seconds — not on every source `state_changed`.
+Home Assistant helper: a **group of template and combine sensors** recalculated **together**, **in order**, every X seconds — not on every source `state_changed`.
 
 Each instance is an independent group. Later sensors in the same group can read earlier ones in the **same tick** with `states('sensor.xxx')`.
 
@@ -33,7 +33,7 @@ Each group appears as a service device. Each configured item becomes a `sensor.*
 | Property | Source |
 |----------|--------|
 | Name | Sensor name from the UI |
-| State | Jinja template, evaluated on the group interval |
+| State | Jinja template **or** combine (sum / mean / min / max / median / last / range) |
 | `unit_of_measurement` | Optional |
 | `device_class` | Optional |
 | `state_class` | Optional |
@@ -72,7 +72,9 @@ The integration appears under **Settings → Devices & services → Integrations
 
 1. **Add integration** and search for **Throttled Linked Template**
 2. Set the **group name** and **interval** (seconds, minimum 1, default 5)
-3. Add sensors in evaluation order: name, Jinja template, optional unit / device class / state class
+3. Add sensors in evaluation order. Each one is either:
+   - **Template** — a Jinja template
+   - **Combine** — several source entities, like Home Assistant's "Combine the state of several sensors" helper (`sum`, `mean`, `min`, `max`, `median`, `last`, `range`)
 4. Add, edit, remove or reorder sensors, then create the group
 
 You can add as many groups as you need. They stay independent.
@@ -92,15 +94,13 @@ The group is **not** recreated. Existing `unique_id`s are kept, so entity IDs an
 
 Group: `PV chain` — interval: `5`
 
-1. **PV power W**
-   ```jinja
-   {{ states('sensor.inverter_power') | float(0) }}
-   ```
-2. **PV power kW**
+1. **PV power W** *(combine, sum)*  
+   Sources: `sensor.inverter_1_power`, `sensor.inverter_2_power`
+2. **PV power kW** *(template)*
    ```jinja
    {{ states('sensor.pv_power_w') | float(0) / 1000 }}
    ```
-3. **PV value**
+3. **PV value** *(template)*
    ```jinja
    {{ states('sensor.pv_power_kw') | float(0) * states('input_number.price_kwh') | float(0) }}
    ```
@@ -115,6 +115,7 @@ The `this` variable is available (`this.state`, `this.entity_id`, `this.name`) a
 
 - Recalculation is **only** on the interval (and at startup). Source sensors can change in between; this group will not notice until the next tick.
 - Templates are standard Home Assistant Jinja. They are rendered with `Template.async_render` and are **not** tracked.
+- Combine sensors skip unavailable / non-numeric sources. If none remain, that sensor is `unavailable` for the tick.
 - A render result of `unknown` or `unavailable` makes that sensor unavailable for the tick.
 - Several groups can run in parallel, each with its own coordinator and interval.
 

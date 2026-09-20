@@ -18,16 +18,25 @@ from homeassistant.exceptions import TemplateError
 from homeassistant.helpers import selector
 
 from .const import (
+    COMBINE_TYPES,
+    CONF_COMBINE_TYPE,
     CONF_DEVICE_CLASS,
+    CONF_ENTITY_IDS,
     CONF_INTERVAL,
+    CONF_KIND,
+    CONF_ROUND_DIGITS,
     CONF_SENSOR_ID,
     CONF_SENSORS,
     CONF_STATE_CLASS,
     CONF_TEMPLATE,
     CONF_UNIT_OF_MEASUREMENT,
+    DEFAULT_COMBINE_TYPE,
     DEFAULT_INTERVAL,
+    DEFAULT_ROUND_DIGITS,
     DEVICE_CLASS_OPTIONS,
     DOMAIN,
+    KIND_COMBINE,
+    KIND_TEMPLATE,
     MIN_INTERVAL,
     STATE_CLASS_OPTIONS,
     UNIT_OPTIONS,
@@ -62,16 +71,9 @@ def _group_schema(name: str, interval: int) -> vol.Schema:
     )
 
 
-def _sensor_schema(sensor: Mapping[str, Any] | None = None) -> vol.Schema:
-    """Return the schema for one template sensor."""
-    sensor = sensor or {}
-    fields: dict[Any, Any] = {
-        vol.Required(CONF_NAME, default=str(sensor.get(CONF_NAME, ""))): selector.TextSelector(),
-        vol.Required(
-            CONF_TEMPLATE, default=str(sensor.get(CONF_TEMPLATE, ""))
-        ): selector.TemplateSelector(),
-    }
-
+def _meta_fields(sensor: Mapping[str, Any]) -> dict[Any, Any]:
+    """Return optional unit / device class / state class fields."""
+    fields: dict[Any, Any] = {}
     unit = sensor.get(CONF_UNIT_OF_MEASUREMENT) or None
     if unit:
         fields[
@@ -95,7 +97,60 @@ def _sensor_schema(sensor: Mapping[str, Any] | None = None) -> vol.Schema:
         ] = _select_selector(STATE_CLASS_OPTIONS)
     else:
         fields[vol.Optional(CONF_STATE_CLASS)] = _select_selector(STATE_CLASS_OPTIONS)
+    return fields
 
+
+def _sensor_schema(sensor: Mapping[str, Any] | None = None) -> vol.Schema:
+    """Return the schema for one template sensor."""
+    sensor = sensor or {}
+    fields: dict[Any, Any] = {
+        vol.Required(CONF_NAME, default=str(sensor.get(CONF_NAME, ""))): selector.TextSelector(),
+        vol.Required(
+            CONF_TEMPLATE, default=str(sensor.get(CONF_TEMPLATE, ""))
+        ): selector.TemplateSelector(),
+    }
+    fields.update(_meta_fields(sensor))
+    return vol.Schema(fields)
+
+
+def _combine_schema(sensor: Mapping[str, Any] | None = None) -> vol.Schema:
+    """Return the schema for one combine sensor."""
+    sensor = sensor or {}
+    entity_ids = sensor.get(CONF_ENTITY_IDS) or []
+    combine_type = sensor.get(CONF_COMBINE_TYPE) or DEFAULT_COMBINE_TYPE
+    round_digits = sensor.get(CONF_ROUND_DIGITS, DEFAULT_ROUND_DIGITS)
+    try:
+        round_digits = int(round_digits)
+    except (TypeError, ValueError):
+        round_digits = DEFAULT_ROUND_DIGITS
+    fields: dict[Any, Any] = {
+        vol.Required(CONF_NAME, default=str(sensor.get(CONF_NAME, ""))): selector.TextSelector(),
+        vol.Required(
+            CONF_ENTITY_IDS, default=list(entity_ids)
+        ): selector.EntitySelector(
+            selector.EntitySelectorConfig(multiple=True)
+        ),
+        vol.Required(
+            CONF_COMBINE_TYPE, default=str(combine_type)
+        ): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=list(COMBINE_TYPES),
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                translation_key="combine_type",
+            )
+        ),
+        vol.Required(
+            CONF_ROUND_DIGITS, default=round_digits
+        ): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0,
+                max=6,
+                step=1,
+                mode=selector.NumberSelectorMode.BOX,
+            )
+        ),
+    }
+    fields.update(_meta_fields(sensor))
     return vol.Schema(fields)
 
 
@@ -158,20 +213,49 @@ def _blank_to_none(value: Any) -> str | None:
     return text or None
 
 
+def _normalize_entity_ids(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value] if value else []
+    return [str(item) for item in value if item]
+
+
 def _normalize_sensor(
-    user_input: Mapping[str, Any], sensor_id: str | None = None
+    user_input: Mapping[str, Any],
+    *,
+    kind: str,
+    sensor_id: str | None = None,
 ) -> dict[str, Any]:
     """Normalize a sensor form into stored config."""
-    return {
+    data: dict[str, Any] = {
         CONF_SENSOR_ID: sensor_id or uuid.uuid4().hex,
+        CONF_KIND: kind,
         CONF_NAME: str(user_input[CONF_NAME]).strip(),
-        CONF_TEMPLATE: str(user_input[CONF_TEMPLATE]).strip(),
         CONF_UNIT_OF_MEASUREMENT: _blank_to_none(
             user_input.get(CONF_UNIT_OF_MEASUREMENT)
         ),
         CONF_DEVICE_CLASS: _blank_to_none(user_input.get(CONF_DEVICE_CLASS)),
         CONF_STATE_CLASS: _blank_to_none(user_input.get(CONF_STATE_CLASS)),
     }
+    if kind == KIND_COMBINE:
+        data[CONF_ENTITY_IDS] = _normalize_entity_ids(user_input.get(CONF_ENTITY_IDS))
+        data[CONF_COMBINE_TYPE] = str(
+            user_input.get(CONF_COMBINE_TYPE, DEFAULT_COMBINE_TYPE)
+        )
+        try:
+            data[CONF_ROUND_DIGITS] = int(
+                user_input.get(CONF_ROUND_DIGITS, DEFAULT_ROUND_DIGITS)
+            )
+        except (TypeError, ValueError):
+            data[CONF_ROUND_DIGITS] = DEFAULT_ROUND_DIGITS
+        data[CONF_TEMPLATE] = ""
+    else:
+        data[CONF_TEMPLATE] = str(user_input.get(CONF_TEMPLATE, "")).strip()
+        data[CONF_ENTITY_IDS] = []
+        data[CONF_COMBINE_TYPE] = None
+        data[CONF_ROUND_DIGITS] = DEFAULT_ROUND_DIGITS
+    return data
 
 
 def _sensor_summary(sensors: list[dict[str, Any]]) -> str:
@@ -179,10 +263,16 @@ def _sensor_summary(sensors: list[dict[str, Any]]) -> str:
         return "-"
     lines: list[str] = []
     for index, sensor in enumerate(sensors, start=1):
-        template = " ".join(str(sensor.get(CONF_TEMPLATE, "")).split())
-        if len(template) > 72:
-            template = f"{template[:69]}..."
-        lines.append(f"{index}. {sensor.get(CONF_NAME, index)} — {template}")
+        kind = str(sensor.get(CONF_KIND, KIND_TEMPLATE))
+        if kind == KIND_COMBINE:
+            combine_type = sensor.get(CONF_COMBINE_TYPE, DEFAULT_COMBINE_TYPE)
+            count = len(sensor.get(CONF_ENTITY_IDS) or [])
+            detail = f"combine {combine_type} ({count})"
+        else:
+            detail = " ".join(str(sensor.get(CONF_TEMPLATE, "")).split())
+            if len(detail) > 72:
+                detail = f"{detail[:69]}..."
+        lines.append(f"{index}. {sensor.get(CONF_NAME, index)} — {detail}")
     return "\n".join(lines)
 
 
@@ -268,6 +358,19 @@ class _SensorListMixin:
                 errors[CONF_TEMPLATE] = "invalid_template"
         return errors
 
+    def _validate_combine(self, user_input: Mapping[str, Any]) -> dict[str, str]:
+        errors: dict[str, str] = {}
+        name = str(user_input.get(CONF_NAME, "")).strip()
+        entity_ids = _normalize_entity_ids(user_input.get(CONF_ENTITY_IDS))
+        if not name:
+            errors[CONF_NAME] = "invalid_name"
+        if not entity_ids:
+            errors[CONF_ENTITY_IDS] = "no_entities"
+        combine_type = str(user_input.get(CONF_COMBINE_TYPE, ""))
+        if combine_type not in COMBINE_TYPES:
+            errors[CONF_COMBINE_TYPE] = "invalid_combine_type"
+        return errors
+
     def _menu_options(self) -> list[str]:
         options = ["add_sensor"]
         if self._sensors:
@@ -294,16 +397,49 @@ class _SensorListMixin:
         return self._show_menu()
 
     async def async_step_add_sensor(self, user_input: dict[str, Any] | None = None):
-        """Add a sensor at the end of the group."""
+        """Choose whether the new sensor is a template or a combine."""
+        return self.async_show_menu(
+            step_id="add_sensor",
+            menu_options=["add_template", "add_combine"],
+            description_placeholders={
+                "position": str(len(self._sensors) + 1),
+                "sensors": _sensor_summary(self._sensors),
+            },
+        )
+
+    async def async_step_add_template(self, user_input: dict[str, Any] | None = None):
+        """Add a Jinja template sensor."""
         errors: dict[str, str] = {}
         if user_input is not None:
             errors = self._validate_sensor(user_input)
             if not errors:
-                self._sensors.append(_normalize_sensor(user_input))
+                self._sensors.append(
+                    _normalize_sensor(user_input, kind=KIND_TEMPLATE)
+                )
                 return self._show_menu()
         return self.async_show_form(
-            step_id="add_sensor",
+            step_id="add_template",
             data_schema=_sensor_schema(),
+            errors=errors,
+            description_placeholders={
+                "position": str(len(self._sensors) + 1),
+                "sensors": _sensor_summary(self._sensors),
+            },
+        )
+
+    async def async_step_add_combine(self, user_input: dict[str, Any] | None = None):
+        """Add a combine sensor."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            errors = self._validate_combine(user_input)
+            if not errors:
+                self._sensors.append(
+                    _normalize_sensor(user_input, kind=KIND_COMBINE)
+                )
+                return self._show_menu()
+        return self.async_show_form(
+            step_id="add_combine",
+            data_schema=_combine_schema(),
             errors=errors,
             description_placeholders={
                 "position": str(len(self._sensors) + 1),
@@ -317,18 +453,27 @@ class _SensorListMixin:
             return self._show_menu()
         if len(self._sensors) == 1:
             self._edit_index = 0
-            return await self.async_step_edit_sensor()
+            return await self._async_edit_current()
         if user_input is not None:
             self._edit_index = int(user_input[CONF_INDEX])
-            return await self.async_step_edit_sensor()
+            return await self._async_edit_current()
         return self.async_show_form(
             step_id="pick_edit",
             data_schema=_index_schema(self._sensors),
             description_placeholders={"sensors": _sensor_summary(self._sensors)},
         )
 
+    async def _async_edit_current(self):
+        """Open the editor matching the selected sensor kind."""
+        if self._edit_index is None or not (0 <= self._edit_index < len(self._sensors)):
+            return self._show_menu()
+        current = self._sensors[self._edit_index]
+        if str(current.get(CONF_KIND, KIND_TEMPLATE)) == KIND_COMBINE:
+            return await self.async_step_edit_combine()
+        return await self.async_step_edit_sensor()
+
     async def async_step_edit_sensor(self, user_input: dict[str, Any] | None = None):
-        """Edit the selected sensor without changing its unique id."""
+        """Edit the selected template sensor without changing its unique id."""
         if self._edit_index is None or not (0 <= self._edit_index < len(self._sensors)):
             return self._show_menu()
         current = self._sensors[self._edit_index]
@@ -337,13 +482,41 @@ class _SensorListMixin:
             errors = self._validate_sensor(user_input)
             if not errors:
                 self._sensors[self._edit_index] = _normalize_sensor(
-                    user_input, sensor_id=str(current[CONF_SENSOR_ID])
+                    user_input,
+                    kind=KIND_TEMPLATE,
+                    sensor_id=str(current[CONF_SENSOR_ID]),
                 )
                 self._edit_index = None
                 return self._show_menu()
         return self.async_show_form(
             step_id="edit_sensor",
             data_schema=_sensor_schema(current),
+            errors=errors,
+            description_placeholders={
+                "name": str(current.get(CONF_NAME, "")),
+                "sensors": _sensor_summary(self._sensors),
+            },
+        )
+
+    async def async_step_edit_combine(self, user_input: dict[str, Any] | None = None):
+        """Edit the selected combine sensor without changing its unique id."""
+        if self._edit_index is None or not (0 <= self._edit_index < len(self._sensors)):
+            return self._show_menu()
+        current = self._sensors[self._edit_index]
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            errors = self._validate_combine(user_input)
+            if not errors:
+                self._sensors[self._edit_index] = _normalize_sensor(
+                    user_input,
+                    kind=KIND_COMBINE,
+                    sensor_id=str(current[CONF_SENSOR_ID]),
+                )
+                self._edit_index = None
+                return self._show_menu()
+        return self.async_show_form(
+            step_id="edit_combine",
+            data_schema=_combine_schema(current),
             errors=errors,
             description_placeholders={
                 "name": str(current.get(CONF_NAME, "")),
