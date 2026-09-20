@@ -6,7 +6,10 @@ from collections.abc import Mapping
 from typing import Any
 import uuid
 
-import voluptuous as vol
+try:
+    import probatio as vol
+except ImportError:  # Home Assistant < 2026.9 still ships voluptuous
+    import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.const import (
@@ -42,6 +45,7 @@ ACTION_UP = "up"
 ACTION_DOWN = "down"
 ACTION_TOP = "top"
 ACTION_BOTTOM = "bottom"
+
 
 def _group_schema(name: str, interval: int) -> vol.Schema:
     """Return the schema for group name and interval."""
@@ -120,10 +124,7 @@ def _select_selector(options: list[str]) -> selector.SelectSelector:
 
 def _index_schema(sensors: list[dict[str, Any]]) -> vol.Schema:
     options = [
-        selector.SelectOptionDict(
-            value=str(index),
-            label=f"{index + 1}. {sensor.get(CONF_NAME, sensor.get(CONF_SENSOR_ID, index))}",
-        )
+        {"value": str(index), "label": f"{index + 1}. {sensor.get(CONF_NAME, sensor.get(CONF_SENSOR_ID, index))}"}
         for index, sensor in enumerate(sensors)
     ]
     return vol.Schema(
@@ -177,7 +178,7 @@ def _normalize_sensor(
 
 def _sensor_summary(sensors: list[dict[str, Any]]) -> str:
     if not sensors:
-        return "—"
+        return "-"
     lines: list[str] = []
     for index, sensor in enumerate(sensors, start=1):
         template = " ".join(str(sensor.get(CONF_TEMPLATE, "")).split())
@@ -208,18 +209,19 @@ def move_sensor(
     return items
 
 
-class _SensorListFlow:
-    """Shared add / edit / remove / reorder steps for config and options."""
+class _SensorListMixin:
+    """Sensor list editor used by config and options flows.
 
+    Methods are copied onto the flow classes so ConfigFlow keeps a single
+    Home Assistant base class (required for handler registration).
+    """
+
+    hass: Any
     _name: str
     _interval: int
     _sensors: list[dict[str, Any]]
     _edit_index: int | None
     _menu_step_id: str
-
-    def __init_subclass__(cls, **kwargs: Any) -> None:
-        """Forward ConfigFlow domain= kwargs through the mixin."""
-        super().__init_subclass__(**kwargs)
 
     def _init_list_state(
         self,
@@ -278,7 +280,7 @@ class _SensorListFlow:
         return options
 
     def _show_menu(self):
-        return self.async_show_menu(  # type: ignore[attr-defined]
+        return self.async_show_menu(
             step_id=self._menu_step_id,
             menu_options=self._menu_options(),
             description_placeholders={
@@ -301,7 +303,7 @@ class _SensorListFlow:
             if not errors:
                 self._sensors.append(_normalize_sensor(user_input))
                 return self._show_menu()
-        return self.async_show_form(  # type: ignore[attr-defined]
+        return self.async_show_form(
             step_id="add_sensor",
             data_schema=_sensor_schema(),
             errors=errors,
@@ -321,7 +323,7 @@ class _SensorListFlow:
         if user_input is not None:
             self._edit_index = int(user_input[CONF_INDEX])
             return await self.async_step_edit_sensor()
-        return self.async_show_form(  # type: ignore[attr-defined]
+        return self.async_show_form(
             step_id="pick_edit",
             data_schema=_index_schema(self._sensors),
             description_placeholders={"sensors": _sensor_summary(self._sensors)},
@@ -341,7 +343,7 @@ class _SensorListFlow:
                 )
                 self._edit_index = None
                 return self._show_menu()
-        return self.async_show_form(  # type: ignore[attr-defined]
+        return self.async_show_form(
             step_id="edit_sensor",
             data_schema=_sensor_schema(current),
             errors=errors,
@@ -362,7 +364,7 @@ class _SensorListFlow:
             else:
                 self._sensors.pop(int(user_input[CONF_INDEX]))
                 return self._show_menu()
-        return self.async_show_form(  # type: ignore[attr-defined]
+        return self.async_show_form(
             step_id="pick_remove",
             data_schema=_index_schema(self._sensors),
             errors=errors,
@@ -380,7 +382,7 @@ class _SensorListFlow:
                 str(user_input[CONF_ACTION]),
             )
             return self._show_menu()
-        return self.async_show_form(  # type: ignore[attr-defined]
+        return self.async_show_form(
             step_id="reorder",
             data_schema=_reorder_schema(self._sensors),
             description_placeholders={"sensors": _sensor_summary(self._sensors)},
@@ -397,9 +399,18 @@ class _SensorListFlow:
         raise NotImplementedError
 
 
-class ThrottledLinkedTemplateConfigFlow(
-    config_entries.ConfigFlow, _SensorListFlow, domain=DOMAIN
-):
+def _attach_sensor_list(cls):
+    """Copy editor methods onto a ConfigFlow/OptionsFlow subclass."""
+    for name, attr in _SensorListMixin.__dict__.items():
+        if name.startswith("__") or not callable(attr):
+            continue
+        if name not in cls.__dict__:
+            setattr(cls, name, attr)
+    return cls
+
+
+@_attach_sensor_list
+class ThrottledLinkedTemplateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Throttled Linked Template."""
 
     VERSION = 1
@@ -441,7 +452,8 @@ class ThrottledLinkedTemplateConfigFlow(
         )
 
 
-class ThrottledLinkedTemplateOptionsFlow(config_entries.OptionsFlow, _SensorListFlow):
+@_attach_sensor_list
+class ThrottledLinkedTemplateOptionsFlow(config_entries.OptionsFlow):
     """Handle options for an existing template group."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry | None = None) -> None:
