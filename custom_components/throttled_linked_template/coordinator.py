@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -62,13 +63,17 @@ class ThrottledLinkedTemplateCoordinator(
         self.entry = entry
         self._entities: dict[str, Any] = {}
         self._results: dict[str, SensorTickResult] = {}
+        self._tick_states: dict[str, Any] = {}
+        self._entities_ready = asyncio.Event()
         kwargs: dict[str, Any] = {
             "name": f"{DOMAIN}_{entry.entry_id}",
             "update_interval": timedelta(seconds=entry_interval(entry)),
+            "always_update": True,
         }
         try:
             super().__init__(hass, _LOGGER, config_entry=entry, **kwargs)
         except TypeError:
+            kwargs.pop("always_update", None)
             super().__init__(hass, _LOGGER, **kwargs)
 
     @property
@@ -79,10 +84,31 @@ class ThrottledLinkedTemplateCoordinator(
     def register_entity(self, sensor_id: str, entity: Any) -> None:
         """Register a sensor entity for same-tick state writes."""
         self._entities[sensor_id] = entity
+        expected = self._expected_entity_count()
+        if expected and len(self._entities) >= expected:
+            self._entities_ready.set()
 
     def unregister_entity(self, sensor_id: str) -> None:
         """Forget a sensor entity when it is removed."""
         self._entities.pop(sensor_id, None)
+
+    def _expected_entity_count(self) -> int:
+        return sum(1 for sensor in self.sensors if sensor.get(CONF_SENSOR_ID))
+
+    async def async_wait_for_entities(self) -> None:
+        """Wait until group sensors are added to Home Assistant."""
+        expected = self._expected_entity_count()
+        if expected == 0 or len(self._entities) >= expected:
+            return
+        try:
+            await asyncio.wait_for(self._entities_ready.wait(), timeout=15)
+        except TimeoutError:
+            _LOGGER.warning(
+                "Group '%s' starting with %s/%s sensors registered",
+                entry_name(self.entry),
+                len(self._entities),
+                expected,
+            )
 
     def result_for(self, sensor_id: str) -> SensorTickResult | None:
         """Return the latest result, including in-progress tick values."""
@@ -102,11 +128,12 @@ class ThrottledLinkedTemplateCoordinator(
         )
 
     async def _async_update_data(self) -> dict[str, SensorTickResult]:
-        """Evaluate templates in order and publish each state before the next."""
-        results: dict[str, SensorTickResult] = dict(self._results)
+        """Evaluate sensors in order and publish each state before the next."""
+        results: dict[str, SensorTickResult] = {}
+        self._tick_states = {}
         group_name = entry_name(self.entry)
 
-        for sensor in self.sensors:
+        for index, sensor in enumerate(self.sensors, start=1):
             sensor_id = str(sensor[CONF_SENSOR_ID])
             entity = self._entities.get(sensor_id)
             sensor_name = str(sensor.get(CONF_NAME, sensor_id))
@@ -147,17 +174,23 @@ class ThrottledLinkedTemplateCoordinator(
                         native_value=native_value,
                     )
 
-            # Publish before evaluating the next template in this same tick.
             results[sensor_id] = result
             self._results[sensor_id] = result
-            if entity is not None and getattr(entity, "hass", None) is not None:
-                entity.async_write_ha_state()
+            self._publish_result(entity, result)
+            _LOGGER.debug(
+                "Group '%s' [%s/%s] %s = %s (available=%s)",
+                group_name,
+                index,
+                len(self.sensors),
+                sensor_name,
+                result.native_value,
+                result.available,
+            )
+            # Let the state machine settle before the next sensor reads it.
+            await asyncio.sleep(0)
 
-        stale_ids = set(results) - {
-            str(sensor[CONF_SENSOR_ID]) for sensor in self.sensors
-        }
+        stale_ids = set(self._results) - set(results)
         for stale_id in stale_ids:
-            results.pop(stale_id, None)
             self._results.pop(stale_id, None)
 
         return results
@@ -174,6 +207,7 @@ class ThrottledLinkedTemplateCoordinator(
                 entity_ids,
                 str(sensor.get(CONF_COMBINE_TYPE, DEFAULT_COMBINE_TYPE)),
                 int(sensor.get(CONF_ROUND_DIGITS, DEFAULT_ROUND_DIGITS) or 0),
+                overrides=self._tick_states,
             )
         return self._async_render_template(
             str(sensor.get(CONF_TEMPLATE, "")), entity=entity
@@ -182,7 +216,7 @@ class ThrottledLinkedTemplateCoordinator(
     def _async_render_template(self, template_str: str, entity: Any | None) -> Any:
         """Render a Jinja template without setting up state listeners."""
         template = Template(template_str, self.hass)
-        variables: dict[str, Any] = {}
+        variables: dict[str, Any] = {"linked": dict(self._tick_states)}
         if entity is not None and getattr(entity, "entity_id", None):
             variables["this"] = {
                 "entity_id": entity.entity_id,
@@ -191,10 +225,38 @@ class ThrottledLinkedTemplateCoordinator(
                 "attributes": dict(getattr(entity, "extra_state_attributes", None) or {}),
             }
         rendered = template.async_render(
-            variables=variables or None,
+            variables=variables,
             parse_result=True,
         )
         return _normalize_native_value(rendered)
+
+    def _publish_result(self, entity: Any | None, result: SensorTickResult) -> None:
+        """Write this sensor so the next one in the same tick can read it."""
+        entity_id = getattr(entity, "entity_id", None) if entity is not None else None
+        published = (
+            STATE_UNAVAILABLE
+            if not result.available
+            else _stringify_state(result.native_value)
+        )
+        if entity_id and "." in entity_id and not entity_id.endswith("."):
+            self._tick_states[entity_id] = (
+                result.native_value if result.available else None
+            )
+            self._tick_states[entity_id.split(".", 1)[-1]] = self._tick_states[entity_id]
+
+        if entity is not None and getattr(entity, "hass", None) is not None:
+            try:
+                entity.async_write_ha_state()
+                return
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug(
+                    "async_write_ha_state failed for %s", entity_id, exc_info=True
+                )
+
+        if entity_id and "." in entity_id and not entity_id.endswith("."):
+            self.hass.states.async_set(
+                entity_id, published, None, force_update=True
+            )
 
 
 def _current_state_value(entity: Any) -> Any:
@@ -228,4 +290,15 @@ def _normalize_native_value(value: Any) -> Any:
         if stripped.lower() in {STATE_UNKNOWN, STATE_UNAVAILABLE}:
             return stripped.lower()
         return dt_util.parse_datetime(stripped) or stripped
+    return str(value)
+
+
+def _stringify_state(value: Any) -> str:
+    """Convert a native value to a state string."""
+    if value is None:
+        return STATE_UNAVAILABLE
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
     return str(value)

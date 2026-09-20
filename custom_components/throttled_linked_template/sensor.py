@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -59,7 +60,9 @@ async def async_setup_entry(
         for index, sensor in enumerate(entry_sensors(entry))
         if sensor.get(CONF_SENSOR_ID)
     ]
-    async_add_entities(entities)
+    result = async_add_entities(entities)
+    if inspect.isawaitable(result):
+        await result
 
 
 class ThrottledLinkedTemplateSensor(

@@ -109,6 +109,13 @@ On every tick, sensor 2 reads the value sensor 1 just wrote, and sensor 3 reads 
 
 The `this` variable is available (`this.state`, `this.entity_id`, `this.name`) and refers to the sensor currently being evaluated.
 
+Same-tick values are also in `linked`:
+
+```jinja
+{{ linked['sensor.pv_power_w'] }}
+{{ linked.pv_power_w }}
+```
+
 ---
 
 ## Behaviour notes

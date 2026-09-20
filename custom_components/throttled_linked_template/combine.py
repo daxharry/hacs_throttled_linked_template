@@ -28,22 +28,38 @@ def combine_states(
     entity_ids: list[str],
     combine_type: str,
     round_digits: int,
+    overrides: dict[str, Any] | None = None,
 ) -> float:
-    """Return the combined numeric value of the given entities."""
+    """Return the combined numeric value of the given entities.
+
+    `overrides` holds values already computed earlier in the same group tick,
+    so a combine can read a previous group sensor before the rest of HA does.
+    """
     values: list[float] = []
     last_value: float | None = None
     last_updated: Any = None
 
     for entity_id in entity_ids:
-        state = hass.states.get(entity_id)
-        if state is None or state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE, None, ""):
-            continue
+        raw: Any = None
+        updated = None
+        if overrides and entity_id in overrides:
+            raw = overrides[entity_id]
+        else:
+            state = hass.states.get(entity_id)
+            if state is None or state.state in (
+                STATE_UNKNOWN,
+                STATE_UNAVAILABLE,
+                None,
+                "",
+            ):
+                continue
+            raw = state.state
+            updated = getattr(state, "last_updated", None)
         try:
-            value = float(state.state)
+            value = float(raw)
         except (TypeError, ValueError):
             continue
         values.append(value)
-        updated = getattr(state, "last_updated", None)
         if last_updated is None or (updated is not None and updated > last_updated):
             last_updated = updated
             last_value = value
