@@ -13,6 +13,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import TemplateError
+from jinja2.utils import Namespace
+
 from homeassistant.helpers.template import Template
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
@@ -217,7 +219,8 @@ class ThrottledLinkedTemplateCoordinator(
     def _async_render_template(self, template_str: str, entity: Any | None) -> Any:
         """Render a Jinja template without setting up state listeners."""
         template = Template(template_str, self.hass)
-        variables: dict[str, Any] = {"linked": dict(self._tick_states)}
+        # Namespace is required: HA's sandboxed Jinja blocks dict.attr access.
+        variables: dict[str, Any] = {"linked": Namespace(self._tick_states)}
         if entity is not None and getattr(entity, "entity_id", None):
             variables["this"] = {
                 "entity_id": entity.entity_id,
@@ -225,11 +228,13 @@ class ThrottledLinkedTemplateCoordinator(
                 "state": _current_state_value(entity),
                 "attributes": dict(getattr(entity, "extra_state_attributes", None) or {}),
             }
-        rendered = template.async_render(
-            variables=variables,
-            parse_result=True,
-        )
+        rendered = template.async_render(variables, parse_result=True)
         return _normalize_native_value(rendered)
+
+    @property
+    def linked_keys(self) -> list[str]:
+        """Return the keys published earlier in the current/last tick."""
+        return sorted(self._tick_states)
 
     def _publish_result(
         self, entity: Any | None, result: SensorTickResult, sensor_name: str

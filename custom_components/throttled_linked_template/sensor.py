@@ -151,6 +151,7 @@ class ThrottledLinkedTemplateSensor(
         attributes: dict[str, Any] = {
             ATTR_LINKED_INDEX: self._index + 1,
             CONF_KIND: self._kind,
+            "linked_keys": self.coordinator.linked_keys,
         }
         if self._kind == KIND_COMBINE:
             attributes[CONF_COMBINE_TYPE] = self._combine_type
