@@ -1,0 +1,177 @@
+{
+  "title": "Throttled Linked Template",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Nouveau groupe de templates",
+        "description": "Les capteurs de ce groupe sont recalculés ensemble, dans l'ordre, à intervalle fixe. Un capteur suivant peut lire un capteur précédent dans le même tick avec states('sensor.xxx'). Les changements des sources ne déclenchent pas de recalcul.",
+        "data": {
+          "name": "Nom du groupe",
+          "interval": "Intervalle"
+        },
+        "data_description": {
+          "name": "Nom du helper affiché comme appareil dans Home Assistant.",
+          "interval": "Fréquence de recalcul de tous les capteurs du groupe, en secondes (minimum 1)."
+        }
+      },
+      "menu": {
+        "title": "Capteurs du groupe",
+        "description": "Groupe **{name}** — toutes les {interval} s — {count} capteur(s).\n\nOrdre d'évaluation :\n{sensors}",
+        "menu_options": {
+          "add_sensor": "Ajouter un capteur",
+          "pick_edit": "Modifier un capteur",
+          "pick_remove": "Retirer un capteur",
+          "reorder": "Réordonner les capteurs",
+          "finish": "Créer le groupe"
+        }
+      },
+      "add_sensor": {
+        "title": "Ajouter le capteur {position}",
+        "description": "Ce capteur est évalué en position {position}. Il peut utiliser states() des capteurs déjà listés ci-dessus.\n\nOrdre actuel :\n{sensors}",
+        "data": {
+          "name": "Nom",
+          "template": "Template",
+          "unit_of_measurement": "Unité",
+          "device_class": "Classe d'appareil",
+          "state_class": "Classe d'état"
+        },
+        "data_description": {
+          "name": "Nom affiché du capteur. L'identifiant d'entité est dérivé de ce nom.",
+          "template": "Template Jinja Home Assistant. Les capteurs suivants du groupe peuvent lire celui-ci dans le même tick, une fois son état écrit.",
+          "unit_of_measurement": "Optionnel. Les valeurs personnalisées sont autorisées.",
+          "device_class": "Optionnel.",
+          "state_class": "Optionnel. Utilisez measurement, total ou total_increasing pour les statistiques."
+        }
+      },
+      "pick_edit": {
+        "title": "Modifier un capteur",
+        "description": "Choisissez le capteur à modifier.\n\n{sensors}",
+        "data": {
+          "index": "Capteur"
+        }
+      },
+      "edit_sensor": {
+        "title": "Modifier {name}",
+        "description": "L'identifiant unique est conservé : l'historique et l'entité restent attachés à ce capteur.\n\n{sensors}",
+        "data": {
+          "name": "Nom",
+          "template": "Template",
+          "unit_of_measurement": "Unité",
+          "device_class": "Classe d'appareil",
+          "state_class": "Classe d'état"
+        }
+      },
+      "pick_remove": {
+        "title": "Retirer un capteur",
+        "description": "Le groupe doit conserver au moins un capteur.\n\n{sensors}",
+        "data": {
+          "index": "Capteur"
+        }
+      },
+      "reorder": {
+        "title": "Réordonner les capteurs",
+        "description": "Les templates sont évalués de haut en bas à chaque tick.\n\n{sensors}",
+        "data": {
+          "index": "Capteur",
+          "action": "Déplacer"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Saisissez un nom.",
+      "invalid_interval": "L'intervalle doit être un entier d'au moins 1 seconde.",
+      "invalid_template": "Ce template Jinja n'est pas valide.",
+      "last_sensor": "Le groupe doit conserver au moins un capteur."
+    },
+    "abort": {
+      "already_configured": "Ce groupe est déjà configuré."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Paramètres du groupe",
+        "description": "Modifiez le nom et l'intervalle sans recréer le groupe. Les identifiants uniques des capteurs sont conservés lorsque vous éditez la liste.\n\nCapteurs actuels :\n{sensors}",
+        "data": {
+          "name": "Nom du groupe",
+          "interval": "Intervalle"
+        },
+        "data_description": {
+          "name": "Nom du helper affiché comme appareil dans Home Assistant.",
+          "interval": "Fréquence de recalcul de tous les capteurs du groupe, en secondes (minimum 1)."
+        }
+      },
+      "menu": {
+        "title": "Capteurs du groupe",
+        "description": "Groupe **{name}** — toutes les {interval} s — {count} capteur(s).\n\nOrdre d'évaluation :\n{sensors}",
+        "menu_options": {
+          "add_sensor": "Ajouter un capteur",
+          "pick_edit": "Modifier un capteur",
+          "pick_remove": "Retirer un capteur",
+          "reorder": "Réordonner les capteurs",
+          "finish": "Enregistrer"
+        }
+      },
+      "add_sensor": {
+        "title": "Ajouter le capteur {position}",
+        "description": "Ce capteur est évalué en position {position}. Il peut utiliser states() des capteurs déjà listés ci-dessus.\n\nOrdre actuel :\n{sensors}",
+        "data": {
+          "name": "Nom",
+          "template": "Template",
+          "unit_of_measurement": "Unité",
+          "device_class": "Classe d'appareil",
+          "state_class": "Classe d'état"
+        }
+      },
+      "pick_edit": {
+        "title": "Modifier un capteur",
+        "description": "Choisissez le capteur à modifier.\n\n{sensors}",
+        "data": {
+          "index": "Capteur"
+        }
+      },
+      "edit_sensor": {
+        "title": "Modifier {name}",
+        "description": "L'identifiant unique est conservé : l'historique et l'entité restent attachés à ce capteur.\n\n{sensors}",
+        "data": {
+          "name": "Nom",
+          "template": "Template",
+          "unit_of_measurement": "Unité",
+          "device_class": "Classe d'appareil",
+          "state_class": "Classe d'état"
+        }
+      },
+      "pick_remove": {
+        "title": "Retirer un capteur",
+        "description": "Le groupe doit conserver au moins un capteur.\n\n{sensors}",
+        "data": {
+          "index": "Capteur"
+        }
+      },
+      "reorder": {
+        "title": "Réordonner les capteurs",
+        "description": "Les templates sont évalués de haut en bas à chaque tick.\n\n{sensors}",
+        "data": {
+          "index": "Capteur",
+          "action": "Déplacer"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Saisissez un nom.",
+      "invalid_interval": "L'intervalle doit être un entier d'au moins 1 seconde.",
+      "invalid_template": "Ce template Jinja n'est pas valide.",
+      "last_sensor": "Le groupe doit conserver au moins un capteur."
+    }
+  },
+  "selector": {
+    "reorder_action": {
+      "options": {
+        "up": "Monter",
+        "down": "Descendre",
+        "top": "En haut",
+        "bottom": "En bas"
+      }
+    }
+  }
+}

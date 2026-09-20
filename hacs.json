@@ -1,0 +1,9 @@
+{
+  "name": "Throttled Linked Template",
+  "content_in_root": false,
+  "render_readme": true,
+  "zip_release": false,
+  "homeassistant": "2024.12.0",
+  "iot_class": "local_polling",
+  "domains": ["throttled_linked_template"]
+}

@@ -1,0 +1,177 @@
+{
+  "title": "Throttled Linked Template",
+  "config": {
+    "step": {
+      "user": {
+        "title": "New template group",
+        "description": "Sensors in this group are recalculated together on a fixed interval, in order. Later sensors can read earlier ones in the same tick with states('sensor.xxx'). Source changes do not trigger a recalculation.",
+        "data": {
+          "name": "Group name",
+          "interval": "Interval"
+        },
+        "data_description": {
+          "name": "Name of the helper group shown as a device in Home Assistant.",
+          "interval": "How often every sensor in the group is recalculated, in seconds (minimum 1)."
+        }
+      },
+      "menu": {
+        "title": "Group sensors",
+        "description": "Group **{name}** — every {interval} s — {count} sensor(s).\n\nEvaluation order:\n{sensors}",
+        "menu_options": {
+          "add_sensor": "Add a sensor",
+          "pick_edit": "Edit a sensor",
+          "pick_remove": "Remove a sensor",
+          "reorder": "Reorder sensors",
+          "finish": "Create group"
+        }
+      },
+      "add_sensor": {
+        "title": "Add sensor {position}",
+        "description": "This sensor is evaluated at position {position}. It can use states() of sensors already listed above.\n\nCurrent order:\n{sensors}",
+        "data": {
+          "name": "Name",
+          "template": "Template",
+          "unit_of_measurement": "Unit of measurement",
+          "device_class": "Device class",
+          "state_class": "State class"
+        },
+        "data_description": {
+          "name": "Friendly name of the sensor. The entity ID is derived from this name.",
+          "template": "Home Assistant Jinja template. Later sensors in this group can read this one in the same tick after it has been written.",
+          "unit_of_measurement": "Optional. Custom values are allowed.",
+          "device_class": "Optional.",
+          "state_class": "Optional. Use measurement, total or total_increasing for statistics."
+        }
+      },
+      "pick_edit": {
+        "title": "Edit a sensor",
+        "description": "Choose the sensor to edit.\n\n{sensors}",
+        "data": {
+          "index": "Sensor"
+        }
+      },
+      "edit_sensor": {
+        "title": "Edit {name}",
+        "description": "The unique ID is kept, so history and the entity ID stay attached to this sensor.\n\n{sensors}",
+        "data": {
+          "name": "Name",
+          "template": "Template",
+          "unit_of_measurement": "Unit of measurement",
+          "device_class": "Device class",
+          "state_class": "State class"
+        }
+      },
+      "pick_remove": {
+        "title": "Remove a sensor",
+        "description": "The group must keep at least one sensor.\n\n{sensors}",
+        "data": {
+          "index": "Sensor"
+        }
+      },
+      "reorder": {
+        "title": "Reorder sensors",
+        "description": "Templates are evaluated from top to bottom on every tick.\n\n{sensors}",
+        "data": {
+          "index": "Sensor",
+          "action": "Move"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Enter a name.",
+      "invalid_interval": "Interval must be an integer of at least 1 second.",
+      "invalid_template": "This Jinja template is not valid.",
+      "last_sensor": "The group must keep at least one sensor."
+    },
+    "abort": {
+      "already_configured": "This group is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Group settings",
+        "description": "Change the name and interval without recreating the group. Sensor unique IDs are kept when you edit the list.\n\nCurrent sensors:\n{sensors}",
+        "data": {
+          "name": "Group name",
+          "interval": "Interval"
+        },
+        "data_description": {
+          "name": "Name of the helper group shown as a device in Home Assistant.",
+          "interval": "How often every sensor in the group is recalculated, in seconds (minimum 1)."
+        }
+      },
+      "menu": {
+        "title": "Group sensors",
+        "description": "Group **{name}** — every {interval} s — {count} sensor(s).\n\nEvaluation order:\n{sensors}",
+        "menu_options": {
+          "add_sensor": "Add a sensor",
+          "pick_edit": "Edit a sensor",
+          "pick_remove": "Remove a sensor",
+          "reorder": "Reorder sensors",
+          "finish": "Save"
+        }
+      },
+      "add_sensor": {
+        "title": "Add sensor {position}",
+        "description": "This sensor is evaluated at position {position}. It can use states() of sensors already listed above.\n\nCurrent order:\n{sensors}",
+        "data": {
+          "name": "Name",
+          "template": "Template",
+          "unit_of_measurement": "Unit of measurement",
+          "device_class": "Device class",
+          "state_class": "State class"
+        }
+      },
+      "pick_edit": {
+        "title": "Edit a sensor",
+        "description": "Choose the sensor to edit.\n\n{sensors}",
+        "data": {
+          "index": "Sensor"
+        }
+      },
+      "edit_sensor": {
+        "title": "Edit {name}",
+        "description": "The unique ID is kept, so history and the entity ID stay attached to this sensor.\n\n{sensors}",
+        "data": {
+          "name": "Name",
+          "template": "Template",
+          "unit_of_measurement": "Unit of measurement",
+          "device_class": "Device class",
+          "state_class": "State class"
+        }
+      },
+      "pick_remove": {
+        "title": "Remove a sensor",
+        "description": "The group must keep at least one sensor.\n\n{sensors}",
+        "data": {
+          "index": "Sensor"
+        }
+      },
+      "reorder": {
+        "title": "Reorder sensors",
+        "description": "Templates are evaluated from top to bottom on every tick.\n\n{sensors}",
+        "data": {
+          "index": "Sensor",
+          "action": "Move"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Enter a name.",
+      "invalid_interval": "Interval must be an integer of at least 1 second.",
+      "invalid_template": "This Jinja template is not valid.",
+      "last_sensor": "The group must keep at least one sensor."
+    }
+  },
+  "selector": {
+    "reorder_action": {
+      "options": {
+        "up": "Move up",
+        "down": "Move down",
+        "top": "Move to top",
+        "bottom": "Move to bottom"
+      }
+    }
+  }
+}

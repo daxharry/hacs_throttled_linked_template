@@ -1,0 +1,16 @@
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.zip
+AGENTS.md
+.cursor/
+.cursorrules
+.copilot/
+.agent/
+.vscode/
+.env.*
+*.pem
+*.key
+secrets.yaml

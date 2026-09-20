@@ -1,0 +1,491 @@
+"""Config and options flows for Throttled Linked Template."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import Any
+import uuid
+
+import voluptuous as vol
+
+from homeassistant import config_entries
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+from homeassistant.const import (
+    CONF_DEVICE_CLASS,
+    CONF_NAME,
+    CONF_STATE_CLASS,
+    CONF_UNIT_OF_MEASUREMENT,
+)
+from homeassistant.core import callback
+from homeassistant.exceptions import TemplateError
+from homeassistant.helpers import selector
+from homeassistant.helpers.template import Template
+
+from .const import (
+    CONF_INTERVAL,
+    CONF_SENSOR_ID,
+    CONF_SENSORS,
+    CONF_TEMPLATE,
+    DEFAULT_INTERVAL,
+    DOMAIN,
+    MIN_INTERVAL,
+    UNIT_OPTIONS,
+    entry_interval,
+    entry_name,
+    entry_sensors,
+)
+
+CONF_INDEX = "index"
+CONF_ACTION = "action"
+
+ACTION_UP = "up"
+ACTION_DOWN = "down"
+ACTION_TOP = "top"
+ACTION_BOTTOM = "bottom"
+
+_DEVICE_CLASS_OPTIONS = [cls.value for cls in SensorDeviceClass]
+_STATE_CLASS_OPTIONS = [cls.value for cls in SensorStateClass]
+
+
+def _group_schema(name: str, interval: int) -> vol.Schema:
+    """Return the schema for group name and interval."""
+    return vol.Schema(
+        {
+            vol.Required(CONF_NAME, default=name): selector.TextSelector(),
+            vol.Required(CONF_INTERVAL, default=interval): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=MIN_INTERVAL,
+                    step=1,
+                    mode=selector.NumberSelectorMode.BOX,
+                    unit_of_measurement="s",
+                )
+            ),
+        }
+    )
+
+
+def _sensor_schema(sensor: Mapping[str, Any] | None = None) -> vol.Schema:
+    """Return the schema for one template sensor."""
+    sensor = sensor or {}
+    fields: dict[Any, Any] = {
+        vol.Required(CONF_NAME, default=str(sensor.get(CONF_NAME, ""))): selector.TextSelector(),
+        vol.Required(
+            CONF_TEMPLATE, default=str(sensor.get(CONF_TEMPLATE, ""))
+        ): selector.TemplateSelector(),
+    }
+
+    unit = sensor.get(CONF_UNIT_OF_MEASUREMENT) or None
+    if unit:
+        fields[
+            vol.Optional(CONF_UNIT_OF_MEASUREMENT, default=str(unit))
+        ] = _unit_selector()
+    else:
+        fields[vol.Optional(CONF_UNIT_OF_MEASUREMENT)] = _unit_selector()
+
+    device_class = sensor.get(CONF_DEVICE_CLASS) or None
+    if device_class:
+        fields[
+            vol.Optional(CONF_DEVICE_CLASS, default=str(device_class))
+        ] = _select_selector(_DEVICE_CLASS_OPTIONS)
+    else:
+        fields[vol.Optional(CONF_DEVICE_CLASS)] = _select_selector(_DEVICE_CLASS_OPTIONS)
+
+    state_class = sensor.get(CONF_STATE_CLASS) or None
+    if state_class:
+        fields[
+            vol.Optional(CONF_STATE_CLASS, default=str(state_class))
+        ] = _select_selector(_STATE_CLASS_OPTIONS)
+    else:
+        fields[vol.Optional(CONF_STATE_CLASS)] = _select_selector(_STATE_CLASS_OPTIONS)
+
+    return vol.Schema(fields)
+
+
+def _unit_selector() -> selector.SelectSelector:
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=UNIT_OPTIONS,
+            mode=selector.SelectSelectorMode.DROPDOWN,
+            custom_value=True,
+            sort=True,
+        )
+    )
+
+
+def _select_selector(options: list[str]) -> selector.SelectSelector:
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=options,
+            mode=selector.SelectSelectorMode.DROPDOWN,
+            sort=True,
+        )
+    )
+
+
+def _index_schema(sensors: list[dict[str, Any]]) -> vol.Schema:
+    options = [
+        selector.SelectOptionDict(
+            value=str(index),
+            label=f"{index + 1}. {sensor.get(CONF_NAME, sensor.get(CONF_SENSOR_ID, index))}",
+        )
+        for index, sensor in enumerate(sensors)
+    ]
+    return vol.Schema(
+        {
+            vol.Required(CONF_INDEX): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=options,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            )
+        }
+    )
+
+
+def _reorder_schema(sensors: list[dict[str, Any]]) -> vol.Schema:
+    schema = dict(_index_schema(sensors).schema)
+    schema[
+        vol.Required(CONF_ACTION, default=ACTION_UP)
+    ] = selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[ACTION_UP, ACTION_DOWN, ACTION_TOP, ACTION_BOTTOM],
+            mode=selector.SelectSelectorMode.LIST,
+            translation_key="reorder_action",
+        )
+    )
+    return vol.Schema(schema)
+
+
+def _blank_to_none(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _normalize_sensor(
+    user_input: Mapping[str, Any], sensor_id: str | None = None
+) -> dict[str, Any]:
+    """Normalize a sensor form into stored config."""
+    return {
+        CONF_SENSOR_ID: sensor_id or uuid.uuid4().hex,
+        CONF_NAME: str(user_input[CONF_NAME]).strip(),
+        CONF_TEMPLATE: str(user_input[CONF_TEMPLATE]).strip(),
+        CONF_UNIT_OF_MEASUREMENT: _blank_to_none(
+            user_input.get(CONF_UNIT_OF_MEASUREMENT)
+        ),
+        CONF_DEVICE_CLASS: _blank_to_none(user_input.get(CONF_DEVICE_CLASS)),
+        CONF_STATE_CLASS: _blank_to_none(user_input.get(CONF_STATE_CLASS)),
+    }
+
+
+def _sensor_summary(sensors: list[dict[str, Any]]) -> str:
+    if not sensors:
+        return "—"
+    lines: list[str] = []
+    for index, sensor in enumerate(sensors, start=1):
+        template = " ".join(str(sensor.get(CONF_TEMPLATE, "")).split())
+        if len(template) > 72:
+            template = f"{template[:69]}..."
+        lines.append(f"{index}. {sensor.get(CONF_NAME, index)} — {template}")
+    return "\n".join(lines)
+
+
+def move_sensor(
+    sensors: list[dict[str, Any]], index: int, action: str
+) -> list[dict[str, Any]]:
+    """Return a copy of sensors with one item moved."""
+    items = list(sensors)
+    if not 0 <= index < len(items):
+        return items
+    item = items.pop(index)
+    if action == ACTION_TOP:
+        items.insert(0, item)
+    elif action == ACTION_BOTTOM:
+        items.append(item)
+    elif action == ACTION_UP:
+        items.insert(max(0, index - 1), item)
+    elif action == ACTION_DOWN:
+        items.insert(min(len(items), index + 1), item)
+    else:
+        items.insert(index, item)
+    return items
+
+
+class _SensorListFlow:
+    """Shared add / edit / remove / reorder steps for config and options."""
+
+    _name: str
+    _interval: int
+    _sensors: list[dict[str, Any]]
+    _edit_index: int | None
+    _menu_step_id: str
+
+    def _init_list_state(
+        self,
+        name: str = "",
+        interval: int = DEFAULT_INTERVAL,
+        sensors: list[dict[str, Any]] | None = None,
+        menu_step_id: str = "menu",
+    ) -> None:
+        self._name = name
+        self._interval = interval
+        self._sensors = [dict(sensor) for sensor in (sensors or [])]
+        self._edit_index = None
+        self._menu_step_id = menu_step_id
+
+    def _validate_group(self, user_input: Mapping[str, Any]) -> dict[str, str]:
+        errors: dict[str, str] = {}
+        name = str(user_input.get(CONF_NAME, "")).strip()
+        if not name:
+            errors[CONF_NAME] = "invalid_name"
+        try:
+            interval = int(user_input.get(CONF_INTERVAL, DEFAULT_INTERVAL))
+        except (TypeError, ValueError):
+            errors[CONF_INTERVAL] = "invalid_interval"
+            interval = DEFAULT_INTERVAL
+        if interval < MIN_INTERVAL:
+            errors[CONF_INTERVAL] = "invalid_interval"
+        if not errors:
+            self._name = name
+            self._interval = interval
+        return errors
+
+    def _validate_sensor(self, user_input: Mapping[str, Any]) -> dict[str, str]:
+        errors: dict[str, str] = {}
+        name = str(user_input.get(CONF_NAME, "")).strip()
+        template_str = str(user_input.get(CONF_TEMPLATE, "")).strip()
+        if not name:
+            errors[CONF_NAME] = "invalid_name"
+        if not template_str:
+            errors[CONF_TEMPLATE] = "invalid_template"
+        else:
+            try:
+                Template(template_str, self.hass).ensure_valid()
+            except TemplateError:
+                errors[CONF_TEMPLATE] = "invalid_template"
+        return errors
+
+    def _menu_options(self) -> list[str]:
+        options = ["add_sensor"]
+        if self._sensors:
+            options.extend(["pick_edit", "pick_remove"])
+        if len(self._sensors) > 1:
+            options.append("reorder")
+        options.append("finish")
+        return options
+
+    def _show_menu(self):
+        return self.async_show_menu(  # type: ignore[attr-defined]
+            step_id=self._menu_step_id,
+            menu_options=self._menu_options(),
+            description_placeholders={
+                "name": self._name or "",
+                "interval": str(self._interval),
+                "count": str(len(self._sensors)),
+                "sensors": _sensor_summary(self._sensors),
+            },
+        )
+
+    async def async_step_menu(self, user_input: dict[str, Any] | None = None):
+        """Show the sensor list menu."""
+        return self._show_menu()
+
+    async def async_step_add_sensor(self, user_input: dict[str, Any] | None = None):
+        """Add a sensor at the end of the group."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            errors = self._validate_sensor(user_input)
+            if not errors:
+                self._sensors.append(_normalize_sensor(user_input))
+                return self._show_menu()
+        return self.async_show_form(  # type: ignore[attr-defined]
+            step_id="add_sensor",
+            data_schema=_sensor_schema(),
+            errors=errors,
+            description_placeholders={
+                "position": str(len(self._sensors) + 1),
+                "sensors": _sensor_summary(self._sensors),
+            },
+        )
+
+    async def async_step_pick_edit(self, user_input: dict[str, Any] | None = None):
+        """Pick a sensor to edit."""
+        if not self._sensors:
+            return self._show_menu()
+        if len(self._sensors) == 1:
+            self._edit_index = 0
+            return await self.async_step_edit_sensor()
+        if user_input is not None:
+            self._edit_index = int(user_input[CONF_INDEX])
+            return await self.async_step_edit_sensor()
+        return self.async_show_form(  # type: ignore[attr-defined]
+            step_id="pick_edit",
+            data_schema=_index_schema(self._sensors),
+            description_placeholders={"sensors": _sensor_summary(self._sensors)},
+        )
+
+    async def async_step_edit_sensor(self, user_input: dict[str, Any] | None = None):
+        """Edit the selected sensor without changing its unique id."""
+        if self._edit_index is None or not (0 <= self._edit_index < len(self._sensors)):
+            return self._show_menu()
+        current = self._sensors[self._edit_index]
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            errors = self._validate_sensor(user_input)
+            if not errors:
+                self._sensors[self._edit_index] = _normalize_sensor(
+                    user_input, sensor_id=str(current[CONF_SENSOR_ID])
+                )
+                self._edit_index = None
+                return self._show_menu()
+        return self.async_show_form(  # type: ignore[attr-defined]
+            step_id="edit_sensor",
+            data_schema=_sensor_schema(current),
+            errors=errors,
+            description_placeholders={
+                "name": str(current.get(CONF_NAME, "")),
+                "sensors": _sensor_summary(self._sensors),
+            },
+        )
+
+    async def async_step_pick_remove(self, user_input: dict[str, Any] | None = None):
+        """Remove a sensor from the group."""
+        errors: dict[str, str] = {}
+        if not self._sensors:
+            return self._show_menu()
+        if user_input is not None:
+            if len(self._sensors) <= 1:
+                errors[CONF_INDEX] = "last_sensor"
+            else:
+                self._sensors.pop(int(user_input[CONF_INDEX]))
+                return self._show_menu()
+        return self.async_show_form(  # type: ignore[attr-defined]
+            step_id="pick_remove",
+            data_schema=_index_schema(self._sensors),
+            errors=errors,
+            description_placeholders={"sensors": _sensor_summary(self._sensors)},
+        )
+
+    async def async_step_reorder(self, user_input: dict[str, Any] | None = None):
+        """Change evaluation order."""
+        if len(self._sensors) < 2:
+            return self._show_menu()
+        if user_input is not None:
+            self._sensors = move_sensor(
+                self._sensors,
+                int(user_input[CONF_INDEX]),
+                str(user_input[CONF_ACTION]),
+            )
+            return self._show_menu()
+        return self.async_show_form(  # type: ignore[attr-defined]
+            step_id="reorder",
+            data_schema=_reorder_schema(self._sensors),
+            description_placeholders={"sensors": _sensor_summary(self._sensors)},
+        )
+
+    async def async_step_finish(self, user_input: dict[str, Any] | None = None):
+        """Persist the group when at least one sensor is configured."""
+        if not self._sensors:
+            return await self.async_step_add_sensor()
+        return await self._async_finish_flow()
+
+    async def _async_finish_flow(self):
+        """Implemented by the config or options flow."""
+        raise NotImplementedError
+
+
+class ThrottledLinkedTemplateConfigFlow(
+    _SensorListFlow, config_entries.ConfigFlow, domain=DOMAIN
+):
+    """Handle a config flow for Throttled Linked Template."""
+
+    VERSION = 1
+
+    def __init__(self) -> None:
+        """Initialize the config flow."""
+        super().__init__()
+        self._init_list_state(menu_step_id="menu")
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        """Return the options flow."""
+        return ThrottledLinkedTemplateOptionsFlow(config_entry)
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None):
+        """Create a new group: name and interval."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            errors = self._validate_group(user_input)
+            if not errors:
+                return await self.async_step_add_sensor()
+        return self.async_show_form(
+            step_id="user",
+            data_schema=_group_schema(self._name, self._interval),
+            errors=errors,
+        )
+
+    async def _async_finish_flow(self):
+        """Create the config entry."""
+        return self.async_create_entry(
+            title=self._name,
+            data={CONF_NAME: self._name},
+            options={
+                CONF_INTERVAL: self._interval,
+                CONF_SENSORS: self._sensors,
+            },
+        )
+
+
+class ThrottledLinkedTemplateOptionsFlow(_SensorListFlow, config_entries.OptionsFlow):
+    """Handle options for an existing template group."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry | None = None) -> None:
+        """Initialize the options flow."""
+        super().__init__()
+        self._config_entry = config_entry
+        self._init_list_state(menu_step_id="menu")
+
+    @property
+    def _entry(self) -> config_entries.ConfigEntry:
+        return getattr(self, "config_entry", None) or self._config_entry
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None):
+        """Edit group name and interval, then manage sensors."""
+        if not self._name and self._entry is not None:
+            self._name = entry_name(self._entry)
+            self._interval = entry_interval(self._entry)
+            self._sensors = entry_sensors(self._entry)
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            errors = self._validate_group(user_input)
+            if not errors:
+                return self._show_menu()
+        return self.async_show_form(
+            step_id="init",
+            data_schema=_group_schema(self._name, self._interval),
+            errors=errors,
+            description_placeholders={
+                "sensors": _sensor_summary(self._sensors),
+                "count": str(len(self._sensors)),
+            },
+        )
+
+    async def _async_finish_flow(self):
+        """Save options without recreating the group."""
+        entry = self._entry
+        self.hass.config_entries.async_update_entry(
+            entry,
+            title=self._name,
+            data={**dict(entry.data), CONF_NAME: self._name},
+        )
+        return self.async_create_entry(
+            title="",
+            data={
+                CONF_INTERVAL: self._interval,
+                CONF_SENSORS: self._sensors,
+            },
+        )
