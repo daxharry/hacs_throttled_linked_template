@@ -73,6 +73,11 @@ class ThrottledLinkedTemplateCoordinator(
         self._tick_states: dict[str, Any] = {}
         self._entities_ready = asyncio.Event()
         self._unsub_state: Callable[[], None] | None = None
+        self._pending_trigger: str | None = None
+        self._pending_trigger_entity: str | None = None
+        self.last_update: datetime | None = None
+        self.last_trigger: str | None = None
+        self.last_trigger_entity: str | None = None
         mode = entry_update_mode(entry)
         interval = entry_interval(entry)
         kwargs: dict[str, Any] = {
@@ -138,12 +143,7 @@ class ThrottledLinkedTemplateCoordinator(
         self.async_stop_listeners()
         if entry_update_mode(self.entry) != UPDATE_MODE_STATE:
             return
-        own_ids = {
-            str(entity.entity_id)
-            for entity in self._entities.values()
-            if getattr(entity, "entity_id", None)
-        }
-        sources = collect_trigger_entity_ids(self.sensors, own_ids)
+        sources = collect_trigger_entity_ids(self.sensors, self._own_entity_ids())
         if not sources:
             _LOGGER.warning(
                 "Group '%s' is set to update on source change but no source "
@@ -154,6 +154,23 @@ class ThrottledLinkedTemplateCoordinator(
         self._unsub_state = async_track_state_change_event(
             self.hass, sources, self._async_source_changed
         )
+
+    def _own_entity_ids(self) -> set[str]:
+        return {
+            str(entity.entity_id)
+            for entity in self._entities.values()
+            if getattr(entity, "entity_id", None)
+        }
+
+    @property
+    def trigger_entities(self) -> list[str]:
+        """Return external entities that can trigger a tick in state mode."""
+        return collect_trigger_entity_ids(self.sensors, self._own_entity_ids())
+
+    def mark_trigger(self, reason: str, entity_id: str | None = None) -> None:
+        """Record why the next tick was requested."""
+        self._pending_trigger = reason
+        self._pending_trigger_entity = entity_id
         _LOGGER.debug(
             "Group '%s' listening for changes on %s",
             entry_name(self.entry),
@@ -170,13 +187,9 @@ class ThrottledLinkedTemplateCoordinator(
     def _async_source_changed(self, event: Event) -> None:
         """Recalculate the group after an external source changes."""
         entity_id = event.data.get("entity_id")
-        own_ids = {
-            str(entity.entity_id)
-            for entity in self._entities.values()
-            if getattr(entity, "entity_id", None)
-        }
-        if entity_id in own_ids:
+        if entity_id in self._own_entity_ids():
             return
+        self.mark_trigger("state", str(entity_id) if entity_id else None)
         self.hass.async_create_task(self.async_request_refresh())
 
     async def async_shutdown(self) -> None:
@@ -208,6 +221,16 @@ class ThrottledLinkedTemplateCoordinator(
         results: dict[str, SensorTickResult] = {}
         self._tick_states = {}
         group_name = entry_name(self.entry)
+        trigger = self._pending_trigger
+        trigger_entity = self._pending_trigger_entity
+        self._pending_trigger = None
+        self._pending_trigger_entity = None
+        if not trigger:
+            trigger = (
+                "interval"
+                if entry_update_mode(self.entry) != UPDATE_MODE_STATE
+                else "startup"
+            )
 
         for index, sensor in enumerate(self.sensors, start=1):
             sensor_id = str(sensor[CONF_SENSOR_ID])
@@ -269,6 +292,9 @@ class ThrottledLinkedTemplateCoordinator(
         for stale_id in stale_ids:
             self._results.pop(stale_id, None)
 
+        self.last_update = dt_util.utcnow()
+        self.last_trigger = trigger
+        self.last_trigger_entity = trigger_entity
         return results
 
     def _async_evaluate_sensor(self, sensor: dict[str, Any], entity: Any | None) -> Any:

@@ -28,7 +28,13 @@ Core template sensors re-evaluate when their sources change. That is the right d
 
 ## Created entities
 
-Each group appears as a service device. Each configured item becomes a `sensor.*` entity.
+Each group appears as a service device. Each configured item becomes a `sensor.*` entity. The group also exposes:
+
+| Entity | Meaning |
+|--------|---------|
+| Update mode | `every X seconds` or `on update of sensor.a, sensor.b, …` (full list in `trigger_entities`) |
+| Last update | Timestamp of the last tick (`last_trigger`: `interval` / `state` / `manual` / `startup`, plus `last_trigger_entity`) |
+| Force update | Button that recalculates the whole group immediately |
 
 | Property | Source |
 |----------|--------|

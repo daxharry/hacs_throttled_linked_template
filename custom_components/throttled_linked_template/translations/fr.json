@@ -251,6 +251,21 @@
       "last_sensor": "Le groupe doit conserver au moins un capteur."
     }
   },
+  "entity": {
+    "sensor": {
+      "update_mode": {
+        "name": "Mode de mise à jour"
+      },
+      "last_update": {
+        "name": "Dernière mise à jour"
+      }
+    },
+    "button": {
+      "force_update": {
+        "name": "Forcer la mise à jour"
+      }
+    }
+  },
   "selector": {
     "reorder_action": {
       "options": {

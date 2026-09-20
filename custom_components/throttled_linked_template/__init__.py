@@ -8,8 +8,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from .const import CONF_SENSOR_ID, DOMAIN, entry_sensors, sensor_unique_id
+from .entity import STATUS_UNIQUE_SUFFIXES, status_unique_id
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.BUTTON]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -54,6 +55,9 @@ def _async_cleanup_orphaned_entities(hass: HomeAssistant, entry: ConfigEntry) ->
         for sensor in entry_sensors(entry)
         if sensor.get(CONF_SENSOR_ID)
     }
+    valid_unique_ids.update(
+        status_unique_id(entry.entry_id, suffix) for suffix in STATUS_UNIQUE_SUFFIXES
+    )
     for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
         if entity_entry.unique_id not in valid_unique_ids:
             registry.async_remove(entity_entry.entity_id)

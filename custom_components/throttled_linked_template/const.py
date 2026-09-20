@@ -56,6 +56,11 @@ UPDATE_MODES: Final = (UPDATE_MODE_INTERVAL, UPDATE_MODE_STATE)
 
 ATTR_LINKED_INDEX: Final = "linked_index"
 ATTR_LAST_ERROR: Final = "last_error"
+ATTR_UPDATE_MODE: Final = "update_mode"
+ATTR_INTERVAL: Final = "interval"
+ATTR_TRIGGER_ENTITIES: Final = "trigger_entities"
+ATTR_LAST_TRIGGER: Final = "last_trigger"
+ATTR_LAST_TRIGGER_ENTITY: Final = "last_trigger_entity"
 
 DEVICE_CLASS_OPTIONS: Final = [
     "apparent_power",

@@ -251,6 +251,21 @@
       "last_sensor": "The group must keep at least one sensor."
     }
   },
+  "entity": {
+    "sensor": {
+      "update_mode": {
+        "name": "Update mode"
+      },
+      "last_update": {
+        "name": "Last update"
+      }
+    },
+    "button": {
+      "force_update": {
+        "name": "Force update"
+      }
+    }
+  },
   "selector": {
     "reorder_action": {
       "options": {
