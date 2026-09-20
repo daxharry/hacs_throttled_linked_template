@@ -9,7 +9,6 @@ import uuid
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import (
     CONF_DEVICE_CLASS,
     CONF_NAME,
@@ -19,7 +18,6 @@ from homeassistant.const import (
 from homeassistant.core import callback
 from homeassistant.exceptions import TemplateError
 from homeassistant.helpers import selector
-from homeassistant.helpers.template import Template
 
 from .const import (
     CONF_INTERVAL,
@@ -27,8 +25,10 @@ from .const import (
     CONF_SENSORS,
     CONF_TEMPLATE,
     DEFAULT_INTERVAL,
+    DEVICE_CLASS_OPTIONS,
     DOMAIN,
     MIN_INTERVAL,
+    STATE_CLASS_OPTIONS,
     UNIT_OPTIONS,
     entry_interval,
     entry_name,
@@ -42,10 +42,6 @@ ACTION_UP = "up"
 ACTION_DOWN = "down"
 ACTION_TOP = "top"
 ACTION_BOTTOM = "bottom"
-
-_DEVICE_CLASS_OPTIONS = [cls.value for cls in SensorDeviceClass]
-_STATE_CLASS_OPTIONS = [cls.value for cls in SensorStateClass]
-
 
 def _group_schema(name: str, interval: int) -> vol.Schema:
     """Return the schema for group name and interval."""
@@ -86,17 +82,17 @@ def _sensor_schema(sensor: Mapping[str, Any] | None = None) -> vol.Schema:
     if device_class:
         fields[
             vol.Optional(CONF_DEVICE_CLASS, default=str(device_class))
-        ] = _select_selector(_DEVICE_CLASS_OPTIONS)
+        ] = _select_selector(DEVICE_CLASS_OPTIONS)
     else:
-        fields[vol.Optional(CONF_DEVICE_CLASS)] = _select_selector(_DEVICE_CLASS_OPTIONS)
+        fields[vol.Optional(CONF_DEVICE_CLASS)] = _select_selector(DEVICE_CLASS_OPTIONS)
 
     state_class = sensor.get(CONF_STATE_CLASS) or None
     if state_class:
         fields[
             vol.Optional(CONF_STATE_CLASS, default=str(state_class))
-        ] = _select_selector(_STATE_CLASS_OPTIONS)
+        ] = _select_selector(STATE_CLASS_OPTIONS)
     else:
-        fields[vol.Optional(CONF_STATE_CLASS)] = _select_selector(_STATE_CLASS_OPTIONS)
+        fields[vol.Optional(CONF_STATE_CLASS)] = _select_selector(STATE_CLASS_OPTIONS)
 
     return vol.Schema(fields)
 
@@ -221,6 +217,10 @@ class _SensorListFlow:
     _edit_index: int | None
     _menu_step_id: str
 
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Forward ConfigFlow domain= kwargs through the mixin."""
+        super().__init_subclass__(**kwargs)
+
     def _init_list_state(
         self,
         name: str = "",
@@ -261,8 +261,10 @@ class _SensorListFlow:
             errors[CONF_TEMPLATE] = "invalid_template"
         else:
             try:
+                from homeassistant.helpers.template import Template
+
                 Template(template_str, self.hass).ensure_valid()
-            except TemplateError:
+            except (TemplateError, ValueError, TypeError):
                 errors[CONF_TEMPLATE] = "invalid_template"
         return errors
 
@@ -396,7 +398,7 @@ class _SensorListFlow:
 
 
 class ThrottledLinkedTemplateConfigFlow(
-    _SensorListFlow, config_entries.ConfigFlow, domain=DOMAIN
+    config_entries.ConfigFlow, _SensorListFlow, domain=DOMAIN
 ):
     """Handle a config flow for Throttled Linked Template."""
 
@@ -404,7 +406,6 @@ class ThrottledLinkedTemplateConfigFlow(
 
     def __init__(self) -> None:
         """Initialize the config flow."""
-        super().__init__()
         self._init_list_state(menu_step_id="menu")
 
     @staticmethod
@@ -440,18 +441,20 @@ class ThrottledLinkedTemplateConfigFlow(
         )
 
 
-class ThrottledLinkedTemplateOptionsFlow(_SensorListFlow, config_entries.OptionsFlow):
+class ThrottledLinkedTemplateOptionsFlow(config_entries.OptionsFlow, _SensorListFlow):
     """Handle options for an existing template group."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry | None = None) -> None:
         """Initialize the options flow."""
-        super().__init__()
         self._config_entry = config_entry
         self._init_list_state(menu_step_id="menu")
 
     @property
     def _entry(self) -> config_entries.ConfigEntry:
-        return getattr(self, "config_entry", None) or self._config_entry
+        entry = getattr(self, "_config_entry", None)
+        if entry is not None:
+            return entry
+        return self.config_entry
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         """Edit group name and interval, then manage sensors."""

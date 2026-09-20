@@ -8,13 +8,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from .const import CONF_SENSOR_ID, DOMAIN, entry_sensors, sensor_unique_id
-from .coordinator import ThrottledLinkedTemplateCoordinator
 
 PLATFORMS = [Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a template group from a config entry."""
+    from .coordinator import ThrottledLinkedTemplateCoordinator
+
     coordinator = ThrottledLinkedTemplateCoordinator(hass, entry)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     entry.runtime_data = coordinator

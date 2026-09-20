@@ -53,13 +53,14 @@ class ThrottledLinkedTemplateCoordinator(
         self.entry = entry
         self._entities: dict[str, Any] = {}
         self._results: dict[str, SensorTickResult] = {}
-        super().__init__(
-            hass,
-            _LOGGER,
-            config_entry=entry,
-            name=f"{DOMAIN}_{entry.entry_id}",
-            update_interval=timedelta(seconds=entry_interval(entry)),
-        )
+        kwargs: dict[str, Any] = {
+            "name": f"{DOMAIN}_{entry.entry_id}",
+            "update_interval": timedelta(seconds=entry_interval(entry)),
+        }
+        try:
+            super().__init__(hass, _LOGGER, config_entry=entry, **kwargs)
+        except TypeError:
+            super().__init__(hass, _LOGGER, **kwargs)
 
     @property
     def sensors(self) -> list[dict[str, Any]]:

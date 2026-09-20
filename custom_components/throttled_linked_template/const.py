@@ -20,6 +20,62 @@ MIN_INTERVAL: Final = 1
 ATTR_LINKED_INDEX: Final = "linked_index"
 ATTR_LAST_ERROR: Final = "last_error"
 
+DEVICE_CLASS_OPTIONS: Final = [
+    "apparent_power",
+    "aqi",
+    "atmospheric_pressure",
+    "battery",
+    "carbon_dioxide",
+    "carbon_monoxide",
+    "current",
+    "distance",
+    "duration",
+    "energy",
+    "energy_storage",
+    "frequency",
+    "gas",
+    "humidity",
+    "illuminance",
+    "irradiance",
+    "moisture",
+    "monetary",
+    "nitrogen_dioxide",
+    "nitrogen_monoxide",
+    "nitrous_oxide",
+    "ozone",
+    "ph",
+    "pm1",
+    "pm10",
+    "pm25",
+    "power",
+    "power_factor",
+    "precipitation",
+    "precipitation_intensity",
+    "pressure",
+    "reactive_power",
+    "signal_strength",
+    "sound_pressure",
+    "speed",
+    "sulphur_dioxide",
+    "temperature",
+    "timestamp",
+    "volatile_organic_compounds",
+    "volatile_organic_compounds_parts",
+    "voltage",
+    "volume",
+    "volume_flow_rate",
+    "volume_storage",
+    "water",
+    "weight",
+    "wind_speed",
+]
+
+STATE_CLASS_OPTIONS: Final = [
+    "measurement",
+    "total",
+    "total_increasing",
+]
+
 # Common units offered in the UI; custom values remain allowed.
 UNIT_OPTIONS: Final = [
     "%",
