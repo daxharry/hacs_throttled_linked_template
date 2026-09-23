@@ -11,6 +11,7 @@ DOMAIN: Final = "throttled_linked_template"
 
 CONF_INTERVAL: Final = "interval"
 CONF_UPDATE_MODE: Final = "update_mode"
+CONF_TRIGGER_ENTITIES: Final = "trigger_entities"
 CONF_SENSORS: Final = "sensors"
 CONF_TEMPLATE: Final = "template"
 CONF_SENSOR_ID: Final = "id"
@@ -48,6 +49,8 @@ DEFAULT_ROUND_DIGITS: Final = 2
 
 DEFAULT_INTERVAL: Final = 5
 MIN_INTERVAL: Final = 1
+# Trailing debounce so a burst of source changes becomes one tick.
+STATE_REFRESH_COOLDOWN: Final = 0.25
 
 UPDATE_MODE_INTERVAL: Final = "interval"
 UPDATE_MODE_STATE: Final = "state"
@@ -171,6 +174,18 @@ def entry_update_mode(entry: ConfigEntry) -> str:
     if mode == UPDATE_MODE_STATE:
         return UPDATE_MODE_STATE
     return UPDATE_MODE_INTERVAL
+
+
+def entry_trigger_entities(entry: ConfigEntry) -> list[str]:
+    """Return entities explicitly selected to trigger a tick."""
+    raw = entry.options.get(
+        CONF_TRIGGER_ENTITIES, entry.data.get(CONF_TRIGGER_ENTITIES, [])
+    )
+    if isinstance(raw, str):
+        return [raw] if raw else []
+    if not isinstance(raw, list):
+        return []
+    return [str(item) for item in raw if item]
 
 
 def entry_sensors(entry: ConfigEntry) -> list[dict[str, Any]]:

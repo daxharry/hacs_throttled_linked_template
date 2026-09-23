@@ -8,7 +8,7 @@ Helper UI for Home Assistant: a **group of template and combine sensors** recalc
 
 Later sensors in the same group can read earlier ones in the **same tick** with `states('sensor.xxx')`. One `DataUpdateCoordinator` per group. Template errors make that sensor `unavailable` and the group continues.
 
-Configured from **Settings → Devices & services**. Open the entry and click **Configure** to change the interval or the ordered sensor list without recreating the group.
+Configured from **Settings → Devices & services**. Open the entry and click **Configure** to change the update mode, trigger entities, interval or the ordered sensor list without recreating the group.
 
 Requires Home Assistant 2024.12+. No YAML, no automations, no extra Python dependencies.
 

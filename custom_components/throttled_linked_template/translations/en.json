@@ -8,12 +8,14 @@
         "data": {
           "name": "Group name",
           "update_mode": "Update mode",
-          "interval": "Interval"
+          "interval": "Interval",
+          "trigger_entities": "Source entities"
         },
         "data_description": {
           "name": "Name of the helper group shown as a device in Home Assistant.",
-          "update_mode": "Recalculate on a timer, or when a source entity used by a combine/template changes.",
-          "interval": "Timer period, or minimum seconds between recalculations in on-change mode (minimum 1)."
+          "update_mode": "Recalculate on a timer, or when selected source entities change.",
+          "interval": "How often every sensor in the group is recalculated, in seconds (minimum 1).",
+          "trigger_entities": "The group is recalculated when any of these entities change."
         }
       },
       "menu": {
@@ -127,6 +129,7 @@
       "invalid_interval": "Interval must be an integer of at least 1 second.",
       "invalid_template": "This Jinja template is not valid.",
       "invalid_update_mode": "Choose a valid update mode.",
+      "no_trigger_entities": "Select at least one source entity.",
       "no_entities": "Select at least one source entity.",
       "invalid_combine_type": "Choose a valid combine type.",
       "last_sensor": "The group must keep at least one sensor."
@@ -139,16 +142,18 @@
     "step": {
       "init": {
         "title": "Group settings",
-        "description": "Change the name, update mode and interval without recreating the group. Sensor unique IDs are kept when you edit the list.\n\nCurrent sensors:\n{sensors}",
+        "description": "Change the name, update mode, interval and source entities without recreating the group. Sensor unique IDs are kept when you edit the list.\n\nCurrent sensors:\n{sensors}",
         "data": {
           "name": "Group name",
           "update_mode": "Update mode",
-          "interval": "Interval"
+          "interval": "Interval",
+          "trigger_entities": "Source entities"
         },
         "data_description": {
           "name": "Name of the helper group shown as a device in Home Assistant.",
-          "update_mode": "Recalculate on a timer, or when a source entity used by a combine/template changes.",
-          "interval": "Timer period, or minimum seconds between recalculations in on-change mode (minimum 1)."
+          "update_mode": "Recalculate on a timer, or when selected source entities change.",
+          "interval": "How often every sensor in the group is recalculated, in seconds (minimum 1).",
+          "trigger_entities": "The group is recalculated when any of these entities change."
         }
       },
       "menu": {
@@ -246,6 +251,7 @@
       "invalid_interval": "Interval must be an integer of at least 1 second.",
       "invalid_template": "This Jinja template is not valid.",
       "invalid_update_mode": "Choose a valid update mode.",
+      "no_trigger_entities": "Select at least one source entity.",
       "no_entities": "Select at least one source entity.",
       "invalid_combine_type": "Choose a valid combine type.",
       "last_sensor": "The group must keep at least one sensor."

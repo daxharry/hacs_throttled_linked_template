@@ -36,13 +36,15 @@ from .const import (
     DOMAIN,
     KIND_COMBINE,
     KIND_TEMPLATE,
+    STATE_REFRESH_COOLDOWN,
     UPDATE_MODE_STATE,
     entry_interval,
     entry_name,
     entry_sensors,
+    entry_trigger_entities,
     entry_update_mode,
 )
-from .sources import collect_trigger_entity_ids
+from .sources import resolve_trigger_entity_ids
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,7 +92,7 @@ class ThrottledLinkedTemplateCoordinator(
                 kwargs["request_refresh_debouncer"] = Debouncer(
                     hass,
                     _LOGGER,
-                    cooldown=float(interval),
+                    cooldown=STATE_REFRESH_COOLDOWN,
                     immediate=False,
                 )
             except TypeError:
@@ -143,16 +145,21 @@ class ThrottledLinkedTemplateCoordinator(
         self.async_stop_listeners()
         if entry_update_mode(self.entry) != UPDATE_MODE_STATE:
             return
-        sources = collect_trigger_entity_ids(self.sensors, self._own_entity_ids())
+        sources = self.trigger_entities
         if not sources:
             _LOGGER.warning(
                 "Group '%s' is set to update on source change but no source "
-                "entities were found in combine lists or templates",
+                "entities were selected",
                 entry_name(self.entry),
             )
             return
         self._unsub_state = async_track_state_change_event(
             self.hass, sources, self._async_source_changed
+        )
+        _LOGGER.debug(
+            "Group '%s' listening for changes on %s",
+            entry_name(self.entry),
+            sources,
         )
 
     def _own_entity_ids(self) -> set[str]:
@@ -164,18 +171,17 @@ class ThrottledLinkedTemplateCoordinator(
 
     @property
     def trigger_entities(self) -> list[str]:
-        """Return external entities that can trigger a tick in state mode."""
-        return collect_trigger_entity_ids(self.sensors, self._own_entity_ids())
+        """Return entities that can trigger a tick in state mode."""
+        return resolve_trigger_entity_ids(
+            self.sensors,
+            self._own_entity_ids(),
+            entry_trigger_entities(self.entry),
+        )
 
     def mark_trigger(self, reason: str, entity_id: str | None = None) -> None:
         """Record why the next tick was requested."""
         self._pending_trigger = reason
         self._pending_trigger_entity = entity_id
-        _LOGGER.debug(
-            "Group '%s' listening for changes on %s",
-            entry_name(self.entry),
-            sources,
-        )
 
     def async_stop_listeners(self) -> None:
         """Remove source entity listeners."""

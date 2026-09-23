@@ -77,14 +77,13 @@ Requires Home Assistant **2024.12** or newer.
 The integration appears under **Settings → Devices & services → Integrations** (not under Helpers).
 
 1. **Add integration** and search for **Throttled Linked Template**
-2. Set the **group name** and **interval** (seconds, minimum 1, default 5)
-3. Choose the **update mode**:
-   - **Every X seconds** — current behaviour, one tick per interval
-   - **When a source entity changes** — the whole group is recalculated (in order) when a combine source or an entity referenced in a template (`states('sensor.xxx')`, …) changes. Group sensors themselves are ignored to avoid a loop. The interval becomes the **minimum time between ticks**.
-4. Add sensors in evaluation order. Each one is either:
+2. Set the **group name** and choose the **update mode**:
+   - **Every X seconds** — one tick per interval (seconds, minimum 1, default 5). The interval field is shown only in this mode.
+   - **When a source entity changes** — pick one or more entities. The whole group is recalculated (in order) as soon as any of them changes. Group sensors themselves are ignored to avoid a loop. A short 0.25 s debounce coalesces a burst of source updates into one tick. Existing groups with no list yet still fall back to combine sources and `states('sensor.xxx')` in templates.
+3. Add sensors in evaluation order. Each one is either:
    - **Template** — a Jinja template
    - **Combine** — several source entities, like Home Assistant's "Combine the state of several sensors" helper (`sum`, `mean`, `min`, `max`, `median`, `last`, `range`)
-5. Add, edit, remove or reorder sensors, then create the group
+4. Add, edit, remove or reorder sensors, then create the group
 
 You can add as many groups as you need. They stay independent.
 
@@ -92,7 +91,7 @@ You can add as many groups as you need. They stay independent.
 
 Open the integration entry → **Configure**:
 
-- Change the group name and interval
+- Change the group name, update mode, interval and trigger entities
 - Add / edit / remove / reorder sensors
 
 The group is **not** recreated. Existing `unique_id`s are kept, so entity IDs and history stay attached when you only edit a template or rename a sensor. Removing a sensor deletes its entity. The group reloads after save.
@@ -131,7 +130,7 @@ Same-tick values of **previous** sensors in this group are in `linked` (the curr
 
 ## Behaviour notes
 
-- Recalculation is either on the interval or when a **source** entity changes (and at startup). Group members are not used as triggers.
+- Recalculation is either on the interval or when a **selected source** entity changes (and at startup). Group members are not used as triggers. On-change mode does not wait for the timer interval.
 - Templates are standard Home Assistant Jinja. They are rendered with `Template.async_render` and are **not** tracked.
 - Combine sensors skip unavailable / non-numeric sources. If none remain, that sensor is `unavailable` for the tick.
 - A render result of `unknown` or `unavailable` makes that sensor unavailable for the tick.

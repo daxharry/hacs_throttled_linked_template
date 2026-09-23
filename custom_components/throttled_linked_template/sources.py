@@ -31,3 +31,16 @@ def collect_trigger_entity_ids(
         found.update(f"{domain}.{object_id}" for domain, object_id in _STATES_DOT.findall(template))
     found -= {entity_id for entity_id in own_entity_ids if entity_id}
     return sorted(found)
+
+
+def resolve_trigger_entity_ids(
+    sensors: list[dict[str, Any]],
+    own_entity_ids: set[str],
+    explicit: list[str] | None = None,
+) -> list[str]:
+    """Prefer entities picked in the UI, else those found in combine/templates."""
+    own = {entity_id for entity_id in own_entity_ids if entity_id}
+    selected = {str(entity_id) for entity_id in (explicit or []) if entity_id}
+    if selected:
+        return sorted(selected - own)
+    return collect_trigger_entity_ids(sensors, own)

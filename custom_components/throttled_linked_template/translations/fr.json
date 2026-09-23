@@ -8,12 +8,14 @@
         "data": {
           "name": "Nom du groupe",
           "update_mode": "Mode de mise à jour",
-          "interval": "Intervalle"
+          "interval": "Intervalle",
+          "trigger_entities": "Entités sources"
         },
         "data_description": {
           "name": "Nom du helper affiché comme appareil dans Home Assistant.",
-          "update_mode": "Recalculer sur un minuteur, ou dès qu'une entité source d'un combine/template change.",
-          "interval": "Période du minuteur, ou délai minimum entre deux recalculs en mode changement (minimum 1 s)."
+          "update_mode": "Recalculer sur un minuteur, ou dès qu'une entité source sélectionnée change.",
+          "interval": "Fréquence de recalcul de tous les capteurs du groupe, en secondes (minimum 1).",
+          "trigger_entities": "Le groupe est recalculé dès que l'une de ces entités change."
         }
       },
       "menu": {
@@ -127,6 +129,7 @@
       "invalid_interval": "L'intervalle doit être un entier d'au moins 1 seconde.",
       "invalid_template": "Ce template Jinja n'est pas valide.",
       "invalid_update_mode": "Choisissez un mode de mise à jour valide.",
+      "no_trigger_entities": "Sélectionnez au moins une entité source.",
       "no_entities": "Sélectionnez au moins une entité source.",
       "invalid_combine_type": "Choisissez un type de combinaison valide.",
       "last_sensor": "Le groupe doit conserver au moins un capteur."
@@ -139,16 +142,18 @@
     "step": {
       "init": {
         "title": "Paramètres du groupe",
-        "description": "Modifiez le nom, le mode de mise à jour et l'intervalle sans recréer le groupe. Les identifiants uniques des capteurs sont conservés lorsque vous éditez la liste.\n\nCapteurs actuels :\n{sensors}",
+        "description": "Modifiez le nom, le mode de mise à jour, l'intervalle et les entités sources sans recréer le groupe. Les identifiants uniques des capteurs sont conservés lorsque vous éditez la liste.\n\nCapteurs actuels :\n{sensors}",
         "data": {
           "name": "Nom du groupe",
           "update_mode": "Mode de mise à jour",
-          "interval": "Intervalle"
+          "interval": "Intervalle",
+          "trigger_entities": "Entités sources"
         },
         "data_description": {
           "name": "Nom du helper affiché comme appareil dans Home Assistant.",
-          "update_mode": "Recalculer sur un minuteur, ou dès qu'une entité source d'un combine/template change.",
-          "interval": "Période du minuteur, ou délai minimum entre deux recalculs en mode changement (minimum 1 s)."
+          "update_mode": "Recalculer sur un minuteur, ou dès qu'une entité source sélectionnée change.",
+          "interval": "Fréquence de recalcul de tous les capteurs du groupe, en secondes (minimum 1).",
+          "trigger_entities": "Le groupe est recalculé dès que l'une de ces entités change."
         }
       },
       "menu": {
@@ -246,6 +251,7 @@
       "invalid_interval": "L'intervalle doit être un entier d'au moins 1 seconde.",
       "invalid_template": "Ce template Jinja n'est pas valide.",
       "invalid_update_mode": "Choisissez un mode de mise à jour valide.",
+      "no_trigger_entities": "Sélectionnez au moins une entité source.",
       "no_entities": "Sélectionnez au moins une entité source.",
       "invalid_combine_type": "Choisissez un type de combinaison valide.",
       "last_sensor": "Le groupe doit conserver au moins un capteur."

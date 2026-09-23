@@ -24,6 +24,7 @@ from .const import (
     CONF_ENTITY_IDS,
     CONF_INTERVAL,
     CONF_UPDATE_MODE,
+    CONF_TRIGGER_ENTITIES,
     CONF_KIND,
     CONF_ROUND_DIGITS,
     CONF_SENSOR_ID,
@@ -42,12 +43,17 @@ from .const import (
     MIN_INTERVAL,
     STATE_CLASS_OPTIONS,
     UNIT_OPTIONS,
+    UPDATE_MODE_INTERVAL,
+    UPDATE_MODE_STATE,
     UPDATE_MODES,
     entry_interval,
     entry_name,
     entry_sensors,
+    entry_trigger_entities,
     entry_update_mode,
 )
+
+from .sources import collect_trigger_entity_ids
 
 CONF_INDEX = "index"
 CONF_ACTION = "action"
@@ -59,9 +65,12 @@ ACTION_BOTTOM = "bottom"
 
 
 def _group_schema(
-    name: str, interval: int, update_mode: str = DEFAULT_UPDATE_MODE
+    name: str,
+    interval: int,
+    update_mode: str = DEFAULT_UPDATE_MODE,
+    trigger_entities: list[str] | None = None,
 ) -> vol.Schema:
-    """Return the schema for group name, mode and interval."""
+    """Return the schema for group name, mode, interval and trigger entities."""
     return vol.Schema(
         {
             vol.Required(CONF_NAME, default=name): selector.TextSelector(),
@@ -74,13 +83,34 @@ def _group_schema(
                     translation_key="update_mode",
                 )
             ),
-            vol.Required(CONF_INTERVAL, default=interval): selector.NumberSelector(
+            vol.Required(
+                CONF_INTERVAL,
+                default=interval,
+                description={
+                    "visible": {
+                        "field": CONF_UPDATE_MODE,
+                        "value": UPDATE_MODE_INTERVAL,
+                    }
+                },
+            ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=MIN_INTERVAL,
                     step=1,
                     mode=selector.NumberSelectorMode.BOX,
                     unit_of_measurement="s",
                 )
+            ),
+            vol.Optional(
+                CONF_TRIGGER_ENTITIES,
+                default=list(trigger_entities or []),
+                description={
+                    "visible": {
+                        "field": CONF_UPDATE_MODE,
+                        "value": UPDATE_MODE_STATE,
+                    }
+                },
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(multiple=True)
             ),
         }
     )
@@ -323,6 +353,7 @@ class _SensorListMixin:
     _name: str
     _interval: int
     _update_mode: str
+    _trigger_entities: list[str]
     _sensors: list[dict[str, Any]]
     _edit_index: int | None
     _menu_step_id: str
@@ -334,10 +365,12 @@ class _SensorListMixin:
         sensors: list[dict[str, Any]] | None = None,
         menu_step_id: str = "menu",
         update_mode: str = DEFAULT_UPDATE_MODE,
+        trigger_entities: list[str] | None = None,
     ) -> None:
         self._name = name
         self._interval = interval
         self._update_mode = update_mode
+        self._trigger_entities = list(trigger_entities or [])
         self._sensors = [dict(sensor) for sensor in (sensors or [])]
         self._edit_index = None
         self._menu_step_id = menu_step_id
@@ -347,20 +380,35 @@ class _SensorListMixin:
         name = str(user_input.get(CONF_NAME, "")).strip()
         if not name:
             errors[CONF_NAME] = "invalid_name"
-        try:
-            interval = int(user_input.get(CONF_INTERVAL, DEFAULT_INTERVAL))
-        except (TypeError, ValueError):
-            errors[CONF_INTERVAL] = "invalid_interval"
-            interval = DEFAULT_INTERVAL
-        if interval < MIN_INTERVAL:
-            errors[CONF_INTERVAL] = "invalid_interval"
         mode = str(user_input.get(CONF_UPDATE_MODE, DEFAULT_UPDATE_MODE))
         if mode not in UPDATE_MODES:
             errors[CONF_UPDATE_MODE] = "invalid_update_mode"
-        if not errors:
-            self._name = name
-            self._interval = interval
-            self._update_mode = mode
+            mode = DEFAULT_UPDATE_MODE
+        interval = self._interval or DEFAULT_INTERVAL
+        if mode == UPDATE_MODE_INTERVAL:
+            try:
+                interval = int(user_input.get(CONF_INTERVAL, DEFAULT_INTERVAL))
+            except (TypeError, ValueError):
+                errors[CONF_INTERVAL] = "invalid_interval"
+                interval = DEFAULT_INTERVAL
+            if interval < MIN_INTERVAL:
+                errors[CONF_INTERVAL] = "invalid_interval"
+        elif CONF_INTERVAL in user_input:
+            try:
+                parsed = int(user_input[CONF_INTERVAL])
+            except (TypeError, ValueError):
+                parsed = interval
+            if parsed >= MIN_INTERVAL:
+                interval = parsed
+        triggers = list(self._trigger_entities)
+        if CONF_TRIGGER_ENTITIES in user_input:
+            triggers = _normalize_entity_ids(user_input.get(CONF_TRIGGER_ENTITIES))
+        if mode == UPDATE_MODE_STATE and not triggers:
+            errors[CONF_TRIGGER_ENTITIES] = "no_trigger_entities"
+        self._name = name
+        self._interval = interval
+        self._update_mode = mode
+        self._trigger_entities = triggers
         return errors
 
     def _validate_sensor(self, user_input: Mapping[str, Any]) -> dict[str, str]:
@@ -631,7 +679,10 @@ class ThrottledLinkedTemplateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
         return self.async_show_form(
             step_id="user",
             data_schema=_group_schema(
-                self._name, self._interval, self._update_mode
+                self._name,
+                self._interval,
+                self._update_mode,
+                self._trigger_entities,
             ),
             errors=errors,
         )
@@ -644,6 +695,7 @@ class ThrottledLinkedTemplateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
             options={
                 CONF_INTERVAL: self._interval,
                 CONF_UPDATE_MODE: self._update_mode,
+                CONF_TRIGGER_ENTITIES: self._trigger_entities,
                 CONF_SENSORS: self._sensors,
             },
         )
@@ -672,6 +724,11 @@ class ThrottledLinkedTemplateOptionsFlow(config_entries.OptionsFlow):
             self._interval = entry_interval(self._entry)
             self._update_mode = entry_update_mode(self._entry)
             self._sensors = entry_sensors(self._entry)
+            self._trigger_entities = entry_trigger_entities(self._entry)
+            if not self._trigger_entities:
+                self._trigger_entities = collect_trigger_entity_ids(
+                    self._sensors, set()
+                )
         errors: dict[str, str] = {}
         if user_input is not None:
             errors = self._validate_group(user_input)
@@ -680,7 +737,10 @@ class ThrottledLinkedTemplateOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="init",
             data_schema=_group_schema(
-                self._name, self._interval, self._update_mode
+                self._name,
+                self._interval,
+                self._update_mode,
+                self._trigger_entities,
             ),
             errors=errors,
             description_placeholders={
@@ -702,6 +762,7 @@ class ThrottledLinkedTemplateOptionsFlow(config_entries.OptionsFlow):
             data={
                 CONF_INTERVAL: self._interval,
                 CONF_UPDATE_MODE: self._update_mode,
+                CONF_TRIGGER_ENTITIES: self._trigger_entities,
                 CONF_SENSORS: self._sensors,
             },
         )
